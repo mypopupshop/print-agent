@@ -1,0 +1,10 @@
+{
+  "epson": "EPSON_TM_M30",
+  "tsc": "TSC_TTP_244",
+  "a4": "Canon_LBP2900",
+  "port": 6319,
+  "logLevel": "info",
+  "retryAttempts": 3,
+  "retryDelay": 2000,
+  "queueConcurrency": 1
+}

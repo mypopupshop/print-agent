@@ -1,0 +1,72 @@
+{
+  "name": "print-agent",
+  "version": "1.0.0",
+  "description": "Silent Print Agent - Local REST API for POS printing",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "nodemon --exec electron .",
+    "build": "electron-builder --win",
+    "test": "jest",
+    "lint": "eslint src/**/*.js"
+  },
+  "keywords": [
+    "print",
+    "pos",
+    "thermal",
+    "label",
+    "escpos",
+    "tspl",
+    "zpl"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^28.0.0",
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "async": "^3.2.5",
+    "escpos": "^3.0.0-alpha.6",
+    "escpos-usb": "^3.0.0-alpha.4",
+    "node-printer": "^1.0.1",
+    "puppeteer": "^21.6.0",
+    "pdf-to-printer": "^5.6.0",
+    "joi": "^17.11.0",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1",
+    "auto-launch": "^5.0.6",
+    "nanoid": "^3.3.7",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.9.1",
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "eslint": "^8.55.0"
+  },
+  "build": {
+    "appId": "com.printagent.app",
+    "productName": "Print Agent",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
+    },
+    "files": [
+      "src/**/*",
+      "config/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ]
+  }
+}
