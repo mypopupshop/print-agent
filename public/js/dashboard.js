@@ -5,40 +5,48 @@ const API_BASE = window.location.origin;
 const TEMPLATES = {
   'test-receipt': 'ESCPOSINITIALIZEESCPOSTEST - Receipt PrinterESCPOSNEWLINEPrint Agent WorkingESCPOSNEWLINEESCPOSCUT',
 
-  'sample-receipt': `ESCPOSINITIALIZE` +
-    `ESCPOSALIGNCTESCPOSBOLDONMy Store NameESCPOSBOLDOFFESCPOSNEWLINE` +
-    `ESCPOSALIGNLT123 Main St, City, StateESCPOSNEWLINE` +
-    `Tel: (555) 123-4567ESCPOSNEWLINEESCPOSNEWLINE` +
-    `ESCPOSALIGNLTDate: ${new Date().toLocaleDateString()}ESCPOSNEWLINE` +
-    `Time: ${new Date().toLocaleTimeString()}ESCPOSNEWLINEESCPOSNEWLINE` +
-    `--------------------------------ESCPOSNEWLINE` +
-    `Item            Qty      PriceESCPOSNEWLINE` +
-    `--------------------------------ESCPOSNEWLINE` +
-    `Product A       2       $10.00ESCPOSNEWLINE` +
-    `Product B       1       $25.00ESCPOSNEWLINE` +
-    `Product C       3       $15.00ESCPOSNEWLINE` +
-    `--------------------------------ESCPOSNEWLINE` +
-    `ESCPOSBOLDONTotal:              $50.00ESCPOSBOLDOFFESCPOSNEWLINE` +
-    `--------------------------------ESCPOSNEWLINEESCPOSNEWLINE` +
-    `Thank you for your purchase!ESCPOSNEWLINEESCPOSNEWLINE` +
-    `ESCPOSCUT`,
-
-  'test-label': `SIZE 60 mm, 40 mm
-GAP 2 mm, 0 mm
-CLS
-TEXT 10,5,"3",0,1,1,"Print Agent Test"
-TEXT 10,35,"2",0,1,1,"Label: 60mm x 40mm - Working OK!"
-PRINT 1
-`,
-
-  'barcode-label': `SIZE 60 mm, 40 mm
-GAP 2 mm, 0 mm
-CLS
-TEXT 50,10,"3",0,1,1,"PRODUCT #12345"
-BARCODE 50,60,"128",80,1,0,2,2,"12345678"
-TEXT 50,180,"2",0,1,1,"$29.99"
-PRINT 1
-`,
+  'sample-receipt': JSON.stringify({
+    type: "structured",
+    store: {
+      name: "M/s RISHABH BOMBAY DYEING",
+      address: "Habsiguda, Hyderabad",
+      phone: "+91-9876543210",
+      gstin: "36ABCDE1234F1Z5"
+    },
+    invoice: {
+      number: "INV-2026-001",
+      date: new Date().toLocaleDateString(),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      cashier: "Rishabh",
+      paymentMethod: "Cash"
+    },
+    customer: {
+      name: "John Doe",
+      phone: "+91-9123456789"
+    },
+    items: [
+      { name: "Bedsheet King Size", variant: "Blue Floral / King", customisation: "Monogram: JD", quantity: 2, unitPrice: 1299.00, discount: 100.00, total: 2498.00 },
+      { name: "Towel Set Premium", variant: "White / Pack of 4", quantity: 1, unitPrice: 899.00, discount: 0, total: 899.00 },
+      { name: "Cotton Pillow Cover Pair", variant: "Grey / Standard", quantity: 3, unitPrice: 349.00, discount: 50.00, total: 997.00 }
+    ],
+    summary: {
+      subtotal: 4394.00,
+      discount: 150.00,
+      taxLabel: "GST",
+      taxPercent: 5,
+      taxAmount: 212.20,
+      shipping: 0,
+      roundOff: -0.20,
+      total: 4456.00,
+      amountPaid: 4500.00,
+      change: 44.00
+    },
+    footer: {
+      message: "Thank you for shopping with us!",
+      returnPolicy: "Exchange within 7 days with bill",
+      website: "www.rishabhbombaydyeing.com"
+    }
+  }, null, 2),
 
   'invoice': `<!DOCTYPE html>
 <html>
@@ -189,9 +197,6 @@ PRINT 1
 // State
 let currentJobHistory = [];
 let statusInterval = null;
-let availableTemplates = {};
-let selectedTemplate = null;
-
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
   initializeTabs();
@@ -199,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPrinterStatus();
   loadQueueStats();
   loadJobHistory();
-  loadLabelTemplates();
+  loadNetworkInfo();
   startStatusPolling();
 });
 
@@ -235,17 +240,20 @@ function initializeButtons() {
   document.getElementById('preview-receipt').addEventListener('click', () => previewReceipt());
   document.getElementById('print-receipt').addEventListener('click', () => printReceipt());
 
-  // Label buttons
-  document.getElementById('preview-label').addEventListener('click', () => previewLabel());
-  document.getElementById('print-label').addEventListener('click', () => printLabel());
-
   // A4 buttons
   document.getElementById('preview-a4').addEventListener('click', () => previewA4());
   document.getElementById('print-a4').addEventListener('click', () => printA4());
 
-  // Label template buttons
-  document.getElementById('template-select').addEventListener('change', (e) => onTemplateSelect(e.target.value));
-  document.getElementById('print-template').addEventListener('click', () => printLabelTemplate());
+  // Sticker buttons
+  document.getElementById('sticker-sample-btn').addEventListener('click', () => loadStickerSample());
+  document.getElementById('print-sticker').addEventListener('click', () => printSticker());
+  attachStickerPreviewListeners();
+
+  // Discounted Sticker buttons
+  document.getElementById('discount-sticker-sample-btn').addEventListener('click', () => loadDiscountStickerSample());
+  document.getElementById('print-discount-sticker').addEventListener('click', () => printDiscountSticker());
+  attachDiscountStickerPreviewListeners();
+
 }
 
 // Load template into textarea
@@ -256,9 +264,6 @@ function loadTemplate(templateName) {
   if (templateName.includes('receipt')) {
     document.getElementById('receipt-data').value = template;
     previewReceipt();
-  } else if (templateName.includes('label')) {
-    document.getElementById('label-data').value = template;
-    previewLabel();
   } else if (templateName.includes('invoice') || templateName.includes('report')) {
     document.getElementById('a4-data').value = template;
     document.querySelector('input[name="a4-type"][value="html"]').checked = true;
@@ -272,8 +277,19 @@ function previewReceipt() {
   const preview = document.getElementById('receipt-preview');
 
   if (!data) {
-    preview.innerHTML = '<div class="preview-placeholder">Enter ESC/POS commands or use templates</div>';
+    preview.innerHTML = '<div class="preview-placeholder">Enter receipt data or use templates</div>';
     return;
+  }
+
+  // Try parsing as structured JSON first
+  try {
+    const parsed = JSON.parse(data);
+    if (parsed.type === 'structured') {
+      preview.innerHTML = renderStructuredReceiptPreview(parsed);
+      return;
+    }
+  } catch (e) {
+    // Not JSON, fall through to ESC/POS preview
   }
 
   // Parse ESC/POS-like commands for preview
@@ -323,14 +339,128 @@ function parseESCPOSForPreview(data) {
   return html || '<div class="preview-placeholder">Preview will appear here</div>';
 }
 
+// Render structured receipt JSON as HTML preview (mimics thermal receipt)
+function renderStructuredReceiptPreview(data) {
+  const esc = escapeHtml;
+  let h = '<div style="font-family: \'Courier New\', monospace; font-size: 12px; line-height: 1.5; padding: 12px 8px; max-width: 100%;">';
+
+  // Store header
+  if (data.store) {
+    h += '<div style="text-align:center; border-top: 2px solid #333; border-bottom: 1px dashed #999; padding: 8px 0; margin-bottom: 8px;">';
+    h += `<div style="font-size: 16px; font-weight: bold;">${esc(data.store.name)}</div>`;
+    if (data.store.address) h += `<div>${esc(data.store.address)}</div>`;
+    if (data.store.phone) h += `<div>Phone: ${esc(data.store.phone)}</div>`;
+    if (data.store.gstin) h += `<div>GSTIN: ${esc(data.store.gstin)}</div>`;
+    if (data.store.email) h += `<div>${esc(data.store.email)}</div>`;
+    h += '</div>';
+  }
+
+  // Invoice details
+  if (data.invoice) {
+    h += '<div style="margin-bottom: 8px;">';
+    if (data.invoice.number) h += `<div>Invoice: ${esc(data.invoice.number)}</div>`;
+    if (data.invoice.date) {
+      let line = `Date: ${esc(data.invoice.date)}`;
+      if (data.invoice.time) line += `&nbsp;&nbsp;&nbsp;Time: ${esc(data.invoice.time)}`;
+      h += `<div>${line}</div>`;
+    }
+    if (data.invoice.cashier) h += `<div>Cashier: ${esc(data.invoice.cashier)}</div>`;
+    if (data.customer) {
+      let cust = `Customer: ${esc(data.customer.name || '')}`;
+      if (data.customer.phone) cust += ` (${esc(data.customer.phone)})`;
+      h += `<div>${cust}</div>`;
+    }
+    h += '</div>';
+  }
+
+  // Items table
+  h += '<div style="border-top: 1px dashed #999; border-bottom: 1px dashed #999; padding: 8px 0; margin-bottom: 8px;">';
+  h += '<div style="font-weight: bold; display: flex; margin-bottom: 6px;">';
+  h += '<span style="flex: 3;">ITEM</span><span style="flex: 0.5; text-align: right;">QTY</span><span style="flex: 1; text-align: right;">PRICE</span><span style="flex: 1; text-align: right;">AMOUNT</span>';
+  h += '</div>';
+
+  if (data.items) {
+    data.items.forEach((item, idx) => {
+      if (idx > 0) h += '<div style="border-top: 1px dotted #ccc; margin: 4px 0;"></div>';
+      h += `<div style="font-weight: bold;">${esc(item.name)}</div>`;
+      if (item.variant) h += `<div style="font-size: 11px; color: #555; padding-left: 8px;">${esc(item.variant)}</div>`;
+      if (item.customisation) h += `<div style="font-size: 11px; color: #555; padding-left: 8px;">${esc(item.customisation)}</div>`;
+      h += '<div style="display: flex;">';
+      h += `<span style="flex: 3;"></span>`;
+      h += `<span style="flex: 0.5; text-align: right;">${item.quantity}</span>`;
+      h += `<span style="flex: 1; text-align: right;">${item.unitPrice != null ? item.unitPrice.toFixed(2) : ''}</span>`;
+      h += `<span style="flex: 1; text-align: right;">${item.total.toFixed(2)}</span>`;
+      h += '</div>';
+      if (item.discount > 0) {
+        h += `<div style="font-size: 11px; color: #c00; padding-left: 8px;">Disc: -${item.discount.toFixed(2)}</div>`;
+      }
+    });
+  }
+  h += '</div>';
+
+  // Summary
+  if (data.summary) {
+    const sm = data.summary;
+    const sline = (label, val) => `<div style="display: flex; justify-content: flex-end; gap: 16px;"><span>${esc(label)}:</span><span style="min-width: 80px; text-align: right;">${Number(val).toFixed(2)}</span></div>`;
+
+    if (sm.subtotal != null) h += sline('Subtotal', sm.subtotal);
+    if (sm.discount > 0) h += sline('Discount', -sm.discount);
+    if (sm.taxAmount > 0) {
+      const tl = sm.taxLabel || 'Tax';
+      const ts = sm.taxPercent ? `${tl} (${sm.taxPercent}%)` : tl;
+      h += sline(ts, sm.taxAmount);
+    }
+    if (sm.shipping != null) h += sline('Shipping', sm.shipping);
+    if (sm.roundOff != null && sm.roundOff !== 0) h += sline('Round Off', sm.roundOff);
+
+    h += '<div style="border-top: 2px solid #333; margin: 8px 0; padding-top: 8px; text-align: center; font-size: 18px; font-weight: bold;">';
+    h += `TOTAL: Rs. ${sm.total.toFixed(2)}`;
+    h += '</div>';
+
+    if (sm.amountPaid != null) h += sline('Paid', sm.amountPaid);
+    if (sm.change != null && sm.change > 0) h += sline('Change', sm.change);
+  }
+
+  // Payment method
+  if (data.invoice && data.invoice.paymentMethod) {
+    h += `<div style="text-align: center; border-top: 1px dashed #999; padding-top: 6px; margin-top: 8px;">Payment: ${esc(data.invoice.paymentMethod)}</div>`;
+  }
+
+  // Footer
+  if (data.footer) {
+    h += '<div style="text-align: center; border-top: 1px dashed #999; padding-top: 8px; margin-top: 8px; font-size: 11px;">';
+    if (data.footer.message) h += `<div>${esc(data.footer.message)}</div>`;
+    if (data.footer.returnPolicy) h += `<div>${esc(data.footer.returnPolicy)}</div>`;
+    if (data.footer.website) h += `<div>${esc(data.footer.website)}</div>`;
+    h += '</div>';
+  }
+
+  h += '<div style="border-top: 2px solid #333; margin-top: 8px;"></div>';
+  h += '</div>';
+  return h;
+}
+
 // Print Receipt
 async function printReceipt() {
-  const data = document.getElementById('receipt-data').value;
+  const rawData = document.getElementById('receipt-data').value;
   const resultDiv = document.getElementById('receipt-result');
 
-  if (!data) {
+  if (!rawData) {
     showResult(resultDiv, 'error', 'Please enter receipt data');
     return;
+  }
+
+  // Determine if data is structured JSON or raw ESC/POS string
+  let payload;
+  try {
+    const parsed = JSON.parse(rawData);
+    if (parsed.type === 'structured') {
+      payload = { data: parsed };
+    } else {
+      payload = { data: rawData };
+    }
+  } catch (e) {
+    payload = { data: rawData };
   }
 
   try {
@@ -339,86 +469,7 @@ async function printReceipt() {
     const response = await fetch(`${API_BASE}/print/receipt`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data })
-    });
-
-    const result = await response.json();
-
-    if (response.ok && result.status === 'ok') {
-      showResult(resultDiv, 'success', `✓ Print job sent! Job ID: ${result.jobId}`);
-      setTimeout(() => {
-        loadQueueStats();
-        loadJobHistory();
-      }, 500);
-    } else {
-      showResult(resultDiv, 'error', `✗ Error: ${result.message || result.error || 'Failed to print'}`);
-    }
-  } catch (error) {
-    showResult(resultDiv, 'error', `✗ Network error: ${error.message}`);
-  }
-}
-
-// Preview Label
-function previewLabel() {
-  const data = document.getElementById('label-data').value;
-  const preview = document.getElementById('label-preview');
-
-  if (!data) {
-    preview.innerHTML = '<div class="preview-placeholder">Enter TSPL commands or use templates</div>';
-    return;
-  }
-
-  // Parse TSPL commands for preview
-  let html = parseTSPLForPreview(data);
-  preview.innerHTML = html;
-}
-
-// Parse TSPL commands to HTML preview
-function parseTSPLForPreview(data) {
-  const lines = data.split('\n');
-  let html = '';
-  let sizeInfo = '';
-
-  lines.forEach(line => {
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith('SIZE')) {
-      sizeInfo = trimmed.replace('SIZE ', '');
-    } else if (trimmed.startsWith('TEXT')) {
-      // TEXT x,y,"font",rotation,x-mul,y-mul,"content"
-      const match = trimmed.match(/TEXT\s+\d+,\d+,"[^"]*",\d+,\d+,\d+,"([^"]*)"/);
-      if (match) {
-        html += `<div style="margin: 4px 0; font-weight: 500;">${escapeHtml(match[1])}</div>`;
-      }
-    } else if (trimmed.startsWith('BARCODE')) {
-      html += '<div style="margin: 8px 0; padding: 4px; background: #000; color: white; font-family: monospace; text-align: center;">||||| BARCODE |||||</div>';
-    }
-  });
-
-  if (sizeInfo) {
-    html = `<div style="font-size: 10px; color: #64748b; margin-bottom: 8px;">${sizeInfo}</div>` + html;
-  }
-
-  return html || '<div class="preview-placeholder">Preview will appear here</div>';
-}
-
-// Print Label
-async function printLabel() {
-  const data = document.getElementById('label-data').value;
-  const resultDiv = document.getElementById('label-result');
-
-  if (!data) {
-    showResult(resultDiv, 'error', 'Please enter label data');
-    return;
-  }
-
-  try {
-    showResult(resultDiv, 'success', 'Sending print job...');
-
-    const response = await fetch(`${API_BASE}/print/label`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data })
+      body: JSON.stringify(payload)
     });
 
     const result = await response.json();
@@ -493,6 +544,44 @@ async function printA4() {
   } catch (error) {
     showResult(resultDiv, 'error', `✗ Network error: ${error.message}`);
   }
+}
+
+// Load network info
+async function loadNetworkInfo() {
+  try {
+    const response = await fetch(`${API_BASE}/network-info`);
+    const data = await response.json();
+
+    if (data.status === 'ok' && data.urls.length > 0) {
+      const container = document.getElementById('network-info');
+      const urlsEl = document.getElementById('network-urls');
+
+      urlsEl.innerHTML = data.urls.map(url => `
+        <span class="network-url" title="Click to copy" onclick="copyToClipboard('${url}', this)">
+          ${url}
+          <span class="copy-hint">click to copy</span>
+        </span>
+      `).join('');
+
+      container.style.display = 'block';
+    }
+  } catch (error) {
+    console.error('Failed to load network info:', error);
+  }
+}
+
+// Copy text to clipboard
+function copyToClipboard(text, el) {
+  navigator.clipboard.writeText(text).then(() => {
+    const hint = el.querySelector('.copy-hint');
+    const original = hint.textContent;
+    hint.textContent = 'copied!';
+    hint.style.opacity = '1';
+    setTimeout(() => {
+      hint.textContent = original;
+      hint.style.opacity = '';
+    }, 1500);
+  });
 }
 
 // Load printer status
@@ -661,286 +750,295 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// Load label templates
-async function loadLabelTemplates() {
-  try {
-    const response = await fetch(`${API_BASE}/label/templates`);
-    const data = await response.json();
+// ===== Sticker Label Functions =====
 
-    if (data.status === 'ok') {
-      availableTemplates = data.templates;
-      renderTemplateOptions(data.templates);
-    }
-  } catch (error) {
-    console.error('Failed to load label templates:', error);
-  }
+// Load sample sticker data
+function loadStickerSample() {
+  document.getElementById('sticker-company_name').value = 'M/s RISHABH BOMBAY DYEING';
+  document.getElementById('sticker-company_description').value = 'Habsiguda, Hyderabad';
+  document.getElementById('sticker-product_name').value = 'Bedsheet King Size Premium';
+  document.getElementById('sticker-description').value = '100% Cotton, 300 TC, Breathable Fabric';
+  document.getElementById('sticker-size').value = 'King';
+  document.getElementById('sticker-price').value = '1299';
+  document.getElementById('sticker-barcode').value = '8901234567890';
+  updateStickerPreview();
 }
 
-// Render template options in dropdown
-function renderTemplateOptions(templates) {
-  const select = document.getElementById('template-select');
-
-  Object.keys(templates).forEach(key => {
-    const template = templates[key];
-    const option = document.createElement('option');
-    option.value = key;
-    option.textContent = template.name;
-    select.appendChild(option);
-  });
+// Collect sticker form data
+function getStickerFormData() {
+  return {
+    company_name: document.getElementById('sticker-company_name').value.trim(),
+    company_description: document.getElementById('sticker-company_description').value.trim(),
+    product_name: document.getElementById('sticker-product_name').value.trim(),
+    description: document.getElementById('sticker-description').value.trim(),
+    size: document.getElementById('sticker-size').value.trim(),
+    price: document.getElementById('sticker-price').value.trim(),
+    barcode: document.getElementById('sticker-barcode').value.trim()
+  };
 }
 
-// Handle template selection
-function onTemplateSelect(templateName) {
-  if (!templateName) {
-    // Clear form
-    document.getElementById('template-info').style.display = 'none';
-    document.getElementById('template-fields-header').style.display = 'none';
-    document.getElementById('template-fields').innerHTML = '';
-    document.getElementById('template-actions').style.display = 'none';
-    document.getElementById('template-preview').innerHTML = '<div class="preview-placeholder">Select a template to get started</div>';
-    selectedTemplate = null;
+// Update sticker live preview
+function updateStickerPreview() {
+  const preview = document.getElementById('sticker-preview');
+  const data = getStickerFormData();
+
+  if (!data.product_name && !data.price && !data.barcode) {
+    preview.innerHTML = '<div class="preview-placeholder">Fill in the fields to see a live preview</div>';
     return;
   }
 
-  const template = availableTemplates[templateName];
-  if (!template) return;
+  let html = '<div style="border: 2px solid #333; padding: 8px; background: white; font-family: Arial, sans-serif; font-size: 9px; line-height: 1.3;">';
 
-  selectedTemplate = templateName;
-
-  // Show template info
-  document.getElementById('template-title').textContent = template.name;
-  document.getElementById('template-description').textContent = template.description;
-  document.getElementById('template-size').textContent = `Size: ${template.size.width}mm × ${template.size.height}mm`;
-  document.getElementById('template-info').style.display = 'block';
-
-  // Generate form fields
-  generateTemplateFields(template.fields);
-
-  // Show fields header and actions
-  document.getElementById('template-fields-header').style.display = 'block';
-  document.getElementById('template-actions').style.display = 'flex';
-
-  // Update preview
-  updateTemplatePreview(template);
-}
-
-// Generate dynamic form fields based on template
-function generateTemplateFields(fields) {
-  const container = document.getElementById('template-fields');
-  container.innerHTML = '';
-
-  fields.forEach(field => {
-    const fieldDiv = document.createElement('div');
-    fieldDiv.className = 'template-field';
-
-    const label = document.createElement('label');
-    label.textContent = field.replace(/_/g, ' ');
-    label.htmlFor = `field-${field}`;
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.id = `field-${field}`;
-    input.name = field;
-    input.placeholder = `Enter ${field.replace(/_/g, ' ')}`;
-    input.required = true;
-
-    // Add example values for specific fields
-    if (field === 'price') {
-      input.placeholder = 'e.g., Rs. 1999';
-    } else if (field === 'date') {
-      input.value = new Date().toLocaleDateString();
-    } else if (field.includes('barcode') || field.includes('code') || field === 'sku' || field === 'tracking_number') {
-      input.placeholder = 'e.g., 123456789';
-    } else if (field === 'discount_percent') {
-      input.placeholder = 'e.g., 40';
-      input.type = 'number';
-      input.min = '1';
-      input.max = '100';
-    } else if (field.includes('price')) {
-      input.placeholder = 'e.g., 6349';
-      input.type = 'number';
-    }
-
-    fieldDiv.appendChild(label);
-    fieldDiv.appendChild(input);
-    container.appendChild(fieldDiv);
-  });
-
-  // Attach listeners for live preview updates
-  attachPreviewUpdateListeners();
-}
-
-// Update template preview with live data
-function updateTemplatePreview(template) {
-  const preview = document.getElementById('template-preview');
-
-  // Check if we have data in the form fields
-  const hasData = template.fields.some(field => {
-    const input = document.getElementById(`field-${field}`);
-    return input && input.value.trim();
-  });
-
-  if (hasData) {
-    // Generate preview with actual data
-    renderLivePreview(template);
-  } else {
-    // Show template info
-    let html = `
-      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 8px;">
-        ${template.size.width}mm × ${template.size.height}mm
-      </div>
-      <div style="font-weight: 600; margin-bottom: 8px;">${template.name}</div>
-      <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">${template.description}</div>
-      <div style="font-size: 11px; color: var(--text-secondary);">
-        Required fields:
-        <ul style="margin-top: 4px; padding-left: 20px;">
-          ${template.fields.map(f => `<li>${f.replace(/_/g, ' ')}</li>`).join('')}
-        </ul>
-      </div>
-    `;
-    preview.innerHTML = html;
+  // Company header
+  html += `<div style="text-align: center; margin-bottom: 2px;">`;
+  html += `<div style="font-size: 9px; font-weight: bold;">${escapeHtml(data.company_name || 'Company Name')}</div>`;
+  if (data.company_description) {
+    html += `<div style="font-size: 7px;">${escapeHtml(data.company_description)}</div>`;
   }
-}
-
-// Render live preview with actual data from form
-function renderLivePreview(template) {
-  const preview = document.getElementById('template-preview');
-
-  // Collect data from form
-  const data = {};
-  template.fields.forEach(field => {
-    const input = document.getElementById(`field-${field}`);
-    data[field] = input ? input.value.trim() : '';
-  });
-
-  // Generate realistic label preview
-  let html = `
-    <div style="border: 2px solid #333; padding: 8px; background: white; font-family: Arial, sans-serif; font-size: 9px; line-height: 1.3; position: relative;">
-      <div style="font-size: 9px; font-weight: bold; text-align: center;">M/s RISHABH BOMBAY DYEING</div>
-      <div style="font-size: 7px; text-align: center; margin-bottom: 8px;">Habsiguda, Hyderabad</div>
-  `;
-
-  // Add discount badge if applicable
-  if (data.discount_percent) {
-    html += `
-      <div style="position: absolute; right: 12px; top: 12px; border: 1px solid #333; padding: 2px 4px; font-size: 8px; font-weight: bold;">
-        ${escapeHtml(data.discount_percent)}%
-      </div>
-    `;
-  }
-
-  // Product name and size
-  html += `
-    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-      <div style="font-size: 12px; font-weight: bold;">${escapeHtml(data.product_name || 'Product Name')}</div>
-      <div style="font-size: 9px;">${escapeHtml(data.size || '')}</div>
-    </div>
-  `;
-
-  // Product type
-  html += `
-    <div style="font-size: 9px; margin-bottom: 6px;">${escapeHtml(data.product_type || 'Product Type')}</div>
-  `;
-
-  // Barcode representation (without duplicate text below)
-  html += `
-    <div style="margin: 8px 0; padding: 4px; background: #000; color: white; font-family: monospace; text-align: center; font-size: 8px; height: 30px; display: flex; align-items: center; justify-content: center;">
-      |||| ${escapeHtml(data.barcode || 'BARCODE')} ||||
-    </div>
-  `;
-
-  // Price section
-  if (data.original_price && data.discounted_price) {
-    html += `
-      <div style="text-align: right; margin-top: 8px;">
-        <div style="font-size: 8px; text-decoration: line-through;">Rs. ${escapeHtml(data.original_price)}/-</div>
-        <div style="font-size: 13px; font-weight: bold;">Rs. ${escapeHtml(data.discounted_price)}/-</div>
-      </div>
-    `;
-  } else if (data.price) {
-    html += `
-      <div style="text-align: right; margin-top: 8px; font-size: 13px; font-weight: bold;">Rs. ${escapeHtml(data.price)}/-</div>
-    `;
-  }
-
   html += `</div>`;
 
+  // Separator
+  html += '<div style="border-top: 1px solid #333; margin: 4px 0;"></div>';
+
+  // Product name
+  html += `<div style="font-size: 11px; font-weight: bold; margin-bottom: 3px;">${escapeHtml(data.product_name || 'Product Name')}</div>`;
+
+  // Description
+  if (data.description) {
+    html += `<div style="font-size: 8px; color: #444; margin-bottom: 3px;">${escapeHtml(data.description)}</div>`;
+  }
+
+  // Size
+  if (data.size) {
+    html += `<div style="font-size: 8px; margin-bottom: 3px;">Size: ${escapeHtml(data.size)}</div>`;
+  }
+
+  // Separator
+  html += '<div style="border-top: 1px solid #333; margin: 4px 0;"></div>';
+
+  // Barcode + Price row
+  html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+  html += `<div style="flex: 1; background: #000; color: white; font-family: monospace; text-align: center; font-size: 7px; padding: 4px 2px; margin-right: 8px;">|||| ${escapeHtml(data.barcode || 'BARCODE')} ||||</div>`;
+  html += `<div style="font-size: 12px; font-weight: bold; white-space: nowrap;">Rs. ${escapeHtml(data.price || '0')}/-</div>`;
+  html += '</div>';
+
+  html += '</div>';
   preview.innerHTML = html;
 }
 
-// Update preview when user types
-function attachPreviewUpdateListeners() {
-  const inputs = document.querySelectorAll('.template-field input');
-  inputs.forEach(input => {
-    input.addEventListener('input', () => {
-      const template = availableTemplates[selectedTemplate];
-      if (template) {
-        updateTemplatePreview(template);
-      }
-    });
+// Attach live preview listeners to sticker form inputs
+function attachStickerPreviewListeners() {
+  const fields = ['company_name', 'company_description', 'product_name', 'description', 'size', 'price', 'barcode'];
+  fields.forEach(field => {
+    const input = document.getElementById(`sticker-${field}`);
+    if (input) {
+      input.addEventListener('input', updateStickerPreview);
+    }
   });
 }
 
-// Print label using template
-async function printLabelTemplate() {
-  const resultDiv = document.getElementById('template-result');
+// Print sticker label
+async function printSticker() {
+  const resultDiv = document.getElementById('sticker-result');
+  const data = getStickerFormData();
 
-  if (!selectedTemplate) {
-    showResult(resultDiv, 'error', 'Please select a template');
+  // Validate required fields
+  const missing = [];
+  if (!data.product_name) missing.push('Product Name');
+  if (!data.price) missing.push('Price');
+  if (!data.barcode) missing.push('Barcode');
+
+  if (missing.length > 0) {
+    // Highlight missing fields
+    ['product_name', 'price', 'barcode'].forEach(field => {
+      const input = document.getElementById(`sticker-${field}`);
+      if (!input.value.trim()) {
+        input.style.borderColor = 'var(--danger)';
+      } else {
+        input.style.borderColor = 'var(--border)';
+      }
+    });
+    showResult(resultDiv, 'error', `Please fill in required fields: ${missing.join(', ')}`);
     return;
   }
 
-  // Collect field data
-  const template = availableTemplates[selectedTemplate];
-  const data = {};
-  let hasErrors = false;
-
-  template.fields.forEach(field => {
-    const input = document.getElementById(`field-${field}`);
-    const value = input.value.trim();
-
-    if (!value) {
-      input.style.borderColor = 'var(--danger)';
-      hasErrors = true;
-    } else {
-      input.style.borderColor = 'var(--border)';
-      data[field] = value;
-    }
+  // Reset border colors
+  ['product_name', 'price', 'barcode'].forEach(field => {
+    document.getElementById(`sticker-${field}`).style.borderColor = 'var(--border)';
   });
 
-  if (hasErrors) {
-    showResult(resultDiv, 'error', 'Please fill in all required fields');
-    return;
-  }
-
-  const copies = parseInt(document.getElementById('template-copies').value) || 1;
+  const copies = parseInt(document.getElementById('sticker-copies').value) || 1;
 
   try {
     showResult(resultDiv, 'success', 'Sending print job...');
 
-    const response = await fetch(`${API_BASE}/label`, {
+    const response = await fetch(`${API_BASE}/print/sticker`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        template: selectedTemplate,
-        data,
-        copies
-      })
+      body: JSON.stringify({ ...data, copies })
     });
 
     const result = await response.json();
 
     if (response.ok && result.status === 'ok') {
-      showResult(resultDiv, 'success', `✓ Label print job sent! Job ID: ${result.jobId} (${result.copies} ${result.copies > 1 ? 'copies' : 'copy'})`);
+      showResult(resultDiv, 'success', `Print job sent! Job ID: ${result.jobId} (${copies} ${copies > 1 ? 'copies' : 'copy'})`);
       setTimeout(() => {
         loadQueueStats();
         loadJobHistory();
       }, 500);
     } else {
-      showResult(resultDiv, 'error', `✗ Error: ${result.message || result.error || 'Failed to print'}`);
+      showResult(resultDiv, 'error', `Error: ${result.message || result.error || 'Failed to print'}`);
     }
   } catch (error) {
-    showResult(resultDiv, 'error', `✗ Network error: ${error.message}`);
+    showResult(resultDiv, 'error', `Network error: ${error.message}`);
+  }
+}
+
+// ===== Discounted Sticker Label Functions =====
+
+function loadDiscountStickerSample() {
+  document.getElementById('discount-sticker-company_name').value = 'M/s RISHABH BOMBAY DYEING';
+  document.getElementById('discount-sticker-company_description').value = 'Habsiguda, Hyderabad';
+  document.getElementById('discount-sticker-product_name').value = 'Bedsheet King Size Premium';
+  document.getElementById('discount-sticker-description').value = '100% Cotton, 300 TC, Breathable Fabric';
+  document.getElementById('discount-sticker-size').value = 'King';
+  document.getElementById('discount-sticker-price').value = '1299';
+  document.getElementById('discount-sticker-offer_percentage').value = '20';
+  document.getElementById('discount-sticker-discounted_price').value = '1039';
+  document.getElementById('discount-sticker-barcode').value = '8901234567890';
+  updateDiscountStickerPreview();
+}
+
+function getDiscountStickerFormData() {
+  return {
+    company_name: document.getElementById('discount-sticker-company_name').value.trim(),
+    company_description: document.getElementById('discount-sticker-company_description').value.trim(),
+    product_name: document.getElementById('discount-sticker-product_name').value.trim(),
+    description: document.getElementById('discount-sticker-description').value.trim(),
+    size: document.getElementById('discount-sticker-size').value.trim(),
+    price: document.getElementById('discount-sticker-price').value.trim(),
+    offer_percentage: document.getElementById('discount-sticker-offer_percentage').value.trim(),
+    discounted_price: document.getElementById('discount-sticker-discounted_price').value.trim(),
+    barcode: document.getElementById('discount-sticker-barcode').value.trim()
+  };
+}
+
+function updateDiscountStickerPreview() {
+  const preview = document.getElementById('discount-sticker-preview');
+  const data = getDiscountStickerFormData();
+
+  if (!data.product_name && !data.price && !data.barcode) {
+    preview.innerHTML = '<div class="preview-placeholder">Fill in the fields to see a live preview</div>';
+    return;
+  }
+
+  let html = '<div style="border: 2px solid #333; padding: 8px; background: white; font-family: Arial, sans-serif; font-size: 9px; line-height: 1.3;">';
+
+  // Company header
+  html += '<div style="text-align: center; margin-bottom: 2px;">';
+  html += `<div style="font-size: 9px; font-weight: bold;">${escapeHtml(data.company_name || 'Company Name')}</div>`;
+  if (data.company_description) {
+    html += `<div style="font-size: 7px;">${escapeHtml(data.company_description)}</div>`;
+  }
+  html += '</div>';
+
+  // Separator
+  html += '<div style="border-top: 1px solid #333; margin: 3px 0;"></div>';
+
+  // Product name
+  html += `<div style="font-size: 10px; font-weight: bold; margin-bottom: 2px;">${escapeHtml(data.product_name || 'Product Name')}</div>`;
+
+  // Description
+  if (data.description) {
+    html += `<div style="font-size: 7px; color: #444; margin-bottom: 2px;">${escapeHtml(data.description)}</div>`;
+  }
+
+  // Size
+  if (data.size) {
+    html += `<div style="font-size: 7px; margin-bottom: 2px;">Size: ${escapeHtml(data.size)}</div>`;
+  }
+
+  // Separator
+  html += '<div style="border-top: 1px solid #333; margin: 3px 0;"></div>';
+
+  // HStack: Barcode (left) + VStack: MRP, discount, price (right)
+  html += '<div style="display: flex; align-items: center; gap: 6px;">';
+  html += `<div style="flex: 1; background: #000; color: white; font-family: monospace; text-align: center; font-size: 7px; padding: 4px 2px;">|||| ${escapeHtml(data.barcode || 'BARCODE')} ||||</div>`;
+  html += '<div style="text-align: right; white-space: nowrap;">';
+  html += `<div style="font-size: 7px; text-decoration: line-through; color: #888;">MRP: Rs.${escapeHtml(data.price || '0')}</div>`;
+  if (data.offer_percentage) {
+    html += `<div style="font-size: 8px; font-weight: bold; color: #c00;">${escapeHtml(data.offer_percentage)}% OFF</div>`;
+  }
+  html += `<div style="font-size: 12px; font-weight: bold;">Rs.${escapeHtml(data.discounted_price || '0')}/-</div>`;
+  html += '</div>';
+  html += '</div>';
+
+  html += '</div>';
+  preview.innerHTML = html;
+}
+
+function attachDiscountStickerPreviewListeners() {
+  const fields = ['company_name', 'company_description', 'product_name', 'description', 'size', 'price', 'offer_percentage', 'discounted_price', 'barcode'];
+  fields.forEach(field => {
+    const input = document.getElementById(`discount-sticker-${field}`);
+    if (input) {
+      input.addEventListener('input', updateDiscountStickerPreview);
+    }
+  });
+}
+
+async function printDiscountSticker() {
+  const resultDiv = document.getElementById('discount-sticker-result');
+  const data = getDiscountStickerFormData();
+
+  const missing = [];
+  if (!data.product_name) missing.push('Product Name');
+  if (!data.price) missing.push('MRP');
+  if (!data.offer_percentage) missing.push('Offer %');
+  if (!data.discounted_price) missing.push('Price After Discount');
+  if (!data.barcode) missing.push('Barcode');
+
+  if (missing.length > 0) {
+    ['product_name', 'price', 'offer_percentage', 'discounted_price', 'barcode'].forEach(field => {
+      const input = document.getElementById(`discount-sticker-${field}`);
+      if (!input.value.trim()) {
+        input.style.borderColor = 'var(--danger)';
+      } else {
+        input.style.borderColor = 'var(--border)';
+      }
+    });
+    showResult(resultDiv, 'error', `Please fill in required fields: ${missing.join(', ')}`);
+    return;
+  }
+
+  ['product_name', 'price', 'offer_percentage', 'discounted_price', 'barcode'].forEach(field => {
+    document.getElementById(`discount-sticker-${field}`).style.borderColor = 'var(--border)';
+  });
+
+  const copies = parseInt(document.getElementById('discount-sticker-copies').value) || 1;
+
+  try {
+    showResult(resultDiv, 'success', 'Sending print job...');
+
+    const response = await fetch(`${API_BASE}/print/discount-sticker`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, copies })
+    });
+
+    const result = await response.json();
+
+    if (response.ok && result.status === 'ok') {
+      showResult(resultDiv, 'success', `Print job sent! Job ID: ${result.jobId} (${copies} ${copies > 1 ? 'copies' : 'copy'})`);
+      setTimeout(() => {
+        loadQueueStats();
+        loadJobHistory();
+      }, 500);
+    } else {
+      showResult(resultDiv, 'error', `Error: ${result.message || result.error || 'Failed to print'}`);
+    }
+  } catch (error) {
+    showResult(resultDiv, 'error', `Network error: ${error.message}`);
   }
 }
 

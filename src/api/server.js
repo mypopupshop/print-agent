@@ -14,6 +14,8 @@ const printLabelRoute = require('./routes/print-label');
 const printA4Route = require('./routes/print-a4');
 const printersRoute = require('./routes/printers');
 const labelRoute = require('./routes/label');
+const printStickerRoute = require('./routes/print-sticker');
+const printDiscountStickerRoute = require('./routes/print-discount-sticker');
 
 /**
  * Create and configure Express application
@@ -79,7 +81,7 @@ function createServer(config) {
 
   // Serve static dashboard files
   const publicPath = path.join(__dirname, '../../public');
-  app.use(express.static(publicPath));
+  app.use(express.static(publicPath, { etag: false, maxAge: 0 }));
 
   // Mount routes
   app.use(printReceiptRoute);
@@ -87,6 +89,8 @@ function createServer(config) {
   app.use(printA4Route);
   app.use(printersRoute);
   app.use(labelRoute);
+  app.use(printStickerRoute);
+  app.use(printDiscountStickerRoute);
 
   // Health check endpoint
   app.get('/health', (req, res) => {
@@ -107,6 +111,8 @@ function createServer(config) {
         'POST /print/label': 'Print TSPL/ZPL to label printer',
         'POST /print/a4': 'Print PDF/HTML to A4 printer',
         'POST /label': 'Print label using template',
+        'POST /print/sticker': 'Print sticker label from structured JSON',
+        'POST /print/discount-sticker': 'Print discounted sticker label from structured JSON',
         'GET /label/templates': 'Get all label templates',
         'GET /label/templates/:name': 'Get specific template details',
         'GET /printers': 'List all printers',
