@@ -78,10 +78,14 @@ async function updateTrayMenu(port) {
         enabled: false
       },
       {
-        label: `API: http://localhost:${port}`,
+        label: 'Open Dashboard',
         click: () => {
           shell.openExternal(`http://localhost:${port}`);
         }
+      },
+      {
+        label: `API: http://localhost:${port}`,
+        enabled: false
       },
       { type: 'separator' },
       {

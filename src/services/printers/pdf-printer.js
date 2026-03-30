@@ -131,10 +131,21 @@ class PDFPrinter extends BasePrinter {
     try {
       page = await this.browser.newPage();
 
-      // Set content
+      // Determine wait strategy based on content
+      // For static HTML (no external resources), use faster strategy
+      const hasExternalResources = html.includes('http://') || html.includes('https://');
+      const waitStrategy = hasExternalResources ? 'networkidle2' : 'domcontentloaded';
+
+      // Use config timeouts if available, otherwise use defaults
+      const defaultTimeout = hasExternalResources
+        ? (this.config?.pdf?.externalResourceTimeout || 10000)
+        : (this.config?.pdf?.staticHtmlTimeout || 3000);
+      const timeout = options.timeout || defaultTimeout;
+
+      // Set content with optimized wait strategy
       await page.setContent(html, {
-        waitUntil: 'networkidle0',
-        timeout: 30000
+        waitUntil: waitStrategy,
+        timeout: timeout
       });
 
       // Generate PDF
@@ -176,10 +187,14 @@ class PDFPrinter extends BasePrinter {
     try {
       page = await this.browser.newPage();
 
-      // Navigate to URL
+      // Navigate to URL with optimized wait strategy
+      // networkidle2 is faster than networkidle0 (waits for 2+ network connections instead of 0)
+      const waitStrategy = options.waitUntil || 'networkidle2';
+      const timeout = options.timeout || this.config?.pdf?.urlTimeout || 15000;
+
       await page.goto(url, {
-        waitUntil: 'networkidle0',
-        timeout: 30000
+        waitUntil: waitStrategy,
+        timeout: timeout
       });
 
       // Generate PDF

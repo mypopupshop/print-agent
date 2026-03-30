@@ -6,5 +6,11 @@
   "logLevel": "info",
   "retryAttempts": 3,
   "retryDelay": 2000,
-  "queueConcurrency": 1
+  "queueConcurrency": 1,
+  "pdf": {
+    "comment": "PDF generation timeout settings (in milliseconds)",
+    "staticHtmlTimeout": 3000,
+    "externalResourceTimeout": 10000,
+    "urlTimeout": 15000
+  }
 }

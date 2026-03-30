@@ -54,12 +54,32 @@ router.get('/status', async (req, res, next) => {
       },
       queue: {
         ...queueStatus,
-        stats: queueStats
+        ...queueStats
       }
     });
 
   } catch (error) {
     logger.error('Get status error:', error);
+    next(error);
+  }
+});
+
+/**
+ * GET /jobs
+ * Get recent print jobs history
+ */
+router.get('/jobs', async (req, res, next) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const jobs = printQueue.getRecentJobs(limit);
+
+    res.json({
+      status: 'ok',
+      jobs
+    });
+
+  } catch (error) {
+    logger.error('Get jobs error:', error);
     next(error);
   }
 });

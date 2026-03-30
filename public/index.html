@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Print Agent Dashboard</title>
+  <link rel="stylesheet" href="/css/dashboard.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🖨️ Silent Print Agent Dashboard</h1>
+      <div class="status-bar">
+        <span class="status-item" id="api-status">
+          <span class="status-dot"></span>
+          <span>API: Connecting...</span>
+        </span>
+        <span class="status-item">
+          <span>Port: 6319</span>
+        </span>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="receipt">Receipt Printer</button>
+      <button class="tab" data-tab="label">Label Printer</button>
+      <button class="tab" data-tab="label-template">Label Templates</button>
+      <button class="tab" data-tab="a4">A4 Printer</button>
+      <button class="tab" data-tab="history">Job History</button>
+    </nav>
+
+    <!-- Overview Tab -->
+    <div class="tab-content active" id="overview-tab">
+      <div class="cards">
+        <div class="card">
+          <h3>Printer Status</h3>
+          <div id="printers-list" class="printers-list">
+            <div class="loading">Loading printers...</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Queue Statistics</h3>
+          <div id="queue-stats" class="stats-grid">
+            <div class="stat">
+              <div class="stat-label">Total Jobs</div>
+              <div class="stat-value">-</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Completed</div>
+              <div class="stat-value">-</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Failed</div>
+              <div class="stat-value">-</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Avg Duration</div>
+              <div class="stat-value">-</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Receipt Printer Tab -->
+    <div class="tab-content" id="receipt-tab">
+      <div class="print-interface">
+        <div class="preview-section">
+          <h3>Print Preview</h3>
+          <div class="preview-container receipt-preview">
+            <div id="receipt-preview" class="receipt-paper">
+              <div class="preview-placeholder">
+                Enter ESC/POS commands or use templates below
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>Receipt Templates</h3>
+          <div class="template-buttons">
+            <button class="btn-template" data-template="test-receipt">Test Receipt</button>
+            <button class="btn-template" data-template="sample-receipt">Sample Sale</button>
+          </div>
+
+          <h3>Custom ESC/POS Commands</h3>
+          <textarea
+            id="receipt-data"
+            class="data-input"
+            placeholder="Enter ESC/POS commands (e.g., ESCPOSINIT, ESCPOSTEXT, etc.)"
+            rows="8"
+          ></textarea>
+
+          <div class="button-group">
+            <button class="btn-primary" id="preview-receipt">Preview</button>
+            <button class="btn-success" id="print-receipt">Print</button>
+          </div>
+
+          <div id="receipt-result" class="result-message"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Label Printer Tab -->
+    <div class="tab-content" id="label-tab">
+      <div class="print-interface">
+        <div class="preview-section">
+          <h3>Print Preview</h3>
+          <div class="preview-container label-preview">
+            <div id="label-preview" class="label-paper">
+              <div class="preview-placeholder">
+                Enter TSPL commands or use templates below
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>Label Templates</h3>
+          <div class="template-buttons">
+            <button class="btn-template" data-template="test-label">Test Label</button>
+            <button class="btn-template" data-template="barcode-label">Barcode Label</button>
+          </div>
+
+          <h3>Custom TSPL Commands</h3>
+          <textarea
+            id="label-data"
+            class="data-input"
+            placeholder="Enter TSPL commands (e.g., SIZE 60 mm, 40 mm...)"
+            rows="8"
+          ></textarea>
+
+          <div class="button-group">
+            <button class="btn-primary" id="preview-label">Preview</button>
+            <button class="btn-success" id="print-label">Print</button>
+          </div>
+
+          <div id="label-result" class="result-message"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Label Template Tab -->
+    <div class="tab-content" id="label-template-tab">
+      <div class="print-interface">
+        <div class="preview-section">
+          <h3>Template Preview</h3>
+          <div class="preview-container label-preview">
+            <div id="template-preview" class="label-paper">
+              <div class="preview-placeholder">
+                Select a template to get started
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>Select Template</h3>
+          <select id="template-select" class="template-select">
+            <option value="">-- Select a template --</option>
+          </select>
+
+          <div id="template-info" class="template-info" style="display: none;">
+            <h4 id="template-title"></h4>
+            <p id="template-description"></p>
+            <p id="template-size"></p>
+          </div>
+
+          <h3 id="template-fields-header" style="display: none;">Template Fields</h3>
+          <div id="template-fields" class="template-fields">
+            <!-- Dynamic fields will be generated here -->
+          </div>
+
+          <div id="template-actions" class="button-group" style="display: none; margin-top: 16px;">
+            <label style="flex: 1; display: flex; align-items: center; gap: 8px; font-size: 14px;">
+              Copies:
+              <input type="number" id="template-copies" min="1" max="100" value="1" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 6px;">
+            </label>
+            <button class="btn-success" id="print-template" style="flex: 2;">Print Label</button>
+          </div>
+
+          <div id="template-result" class="result-message"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- A4 Printer Tab -->
+    <div class="tab-content" id="a4-tab">
+      <div class="print-interface">
+        <div class="preview-section">
+          <h3>Print Preview</h3>
+          <div class="preview-container a4-preview">
+            <iframe id="a4-preview" class="a4-paper"></iframe>
+          </div>
+        </div>
+
+        <div class="control-section">
+          <h3>Document Type</h3>
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="a4-type" value="html" checked>
+              HTML Content
+            </label>
+            <label>
+              <input type="radio" name="a4-type" value="pdf">
+              PDF (Base64)
+            </label>
+          </div>
+
+          <h3>HTML Templates</h3>
+          <div class="template-buttons">
+            <button class="btn-template" data-template="invoice">Sample Invoice</button>
+            <button class="btn-template" data-template="report">Sample Report</button>
+          </div>
+
+          <h3>Content</h3>
+          <textarea
+            id="a4-data"
+            class="data-input"
+            placeholder="Enter HTML content or base64 PDF data"
+            rows="12"
+          ></textarea>
+
+          <div class="button-group">
+            <button class="btn-primary" id="preview-a4">Preview</button>
+            <button class="btn-success" id="print-a4">Print</button>
+          </div>
+
+          <div id="a4-result" class="result-message"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Job History Tab -->
+    <div class="tab-content" id="history-tab">
+      <div class="card">
+        <h3>Recent Print Jobs</h3>
+        <div id="job-history" class="job-history">
+          <div class="loading">Loading job history...</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>
