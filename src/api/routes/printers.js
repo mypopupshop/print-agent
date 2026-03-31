@@ -84,4 +84,33 @@ router.get('/jobs', async (req, res, next) => {
   }
 });
 
+/**
+ * GET /network-info
+ * Get network addresses other devices can use to connect
+ */
+router.get('/network-info', (req, res) => {
+  const os = require('os');
+  const interfaces = os.networkInterfaces();
+  const addresses = [];
+
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        addresses.push({ name, address: iface.address });
+      }
+    }
+  }
+
+  const port = req.socket.localPort;
+  const urls = addresses.map(a => `http://${a.address}:${port}`);
+
+  res.json({
+    status: 'ok',
+    port,
+    addresses,
+    urls,
+    localhost: `http://localhost:${port}`
+  });
+});
+
 module.exports = router;

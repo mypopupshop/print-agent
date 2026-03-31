@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /c/Users/risha/Software/print-agent -not -path */node_modules* -type d)"
+      "Bash(find /c/Users/risha/Software/print-agent -not -path */node_modules* -type d)",
+      "Bash(find /c/Users/risha/Software/print-agent -name test-label*.json -o -name test-receipt*.json -o -name config.example.json)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(find C:UsersrishaSoftwareprint-agent -type f \\\\\\(-name *.jsx -o -name *.tsx -o -name *.vue \\\\\\))"
     ]
   }
 }

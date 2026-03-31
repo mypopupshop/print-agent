@@ -51,7 +51,11 @@ class ESCPOSPrinter extends BasePrinter {
       let buffer;
 
       // Handle different data formats
-      if (typeof data === 'string') {
+      if (typeof data === 'object' && data.type === 'structured') {
+        // Structured receipt JSON - format into ESC/POS commands
+        const { formatReceipt } = require('../templates/receipt-formatter');
+        buffer = formatReceipt(data);
+      } else if (typeof data === 'string') {
         // Assume base64 encoded or plain text
         if (this.isBase64(data)) {
           buffer = Buffer.from(data, 'base64');

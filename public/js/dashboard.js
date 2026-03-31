@@ -904,9 +904,20 @@ function loadDiscountStickerSample() {
   document.getElementById('discount-sticker-size').value = 'King';
   document.getElementById('discount-sticker-price').value = '1299';
   document.getElementById('discount-sticker-offer_percentage').value = '20';
-  document.getElementById('discount-sticker-discounted_price').value = '1039';
+  calculateDiscountedPrice();
   document.getElementById('discount-sticker-barcode').value = '8901234567890';
   updateDiscountStickerPreview();
+}
+
+function calculateDiscountedPrice() {
+  const price = parseFloat(document.getElementById('discount-sticker-price').value);
+  const offer = parseFloat(document.getElementById('discount-sticker-offer_percentage').value);
+  const discountedInput = document.getElementById('discount-sticker-discounted_price');
+  if (!isNaN(price) && !isNaN(offer) && offer > 0 && offer < 100) {
+    discountedInput.value = Math.round(price - (price * offer / 100));
+  } else {
+    discountedInput.value = '';
+  }
 }
 
 function getDiscountStickerFormData() {
@@ -983,6 +994,15 @@ function attachDiscountStickerPreviewListeners() {
     const input = document.getElementById(`discount-sticker-${field}`);
     if (input) {
       input.addEventListener('input', updateDiscountStickerPreview);
+    }
+  });
+  ['price', 'offer_percentage'].forEach(field => {
+    const input = document.getElementById(`discount-sticker-${field}`);
+    if (input) {
+      input.addEventListener('input', () => {
+        calculateDiscountedPrice();
+        updateDiscountStickerPreview();
+      });
     }
   });
 }

@@ -1,0 +1,67 @@
+{
+  "data": {
+    "type": "structured",
+    "store": {
+      "name": "M/s RISHABH BOMBAY DYEING",
+      "address": "Habsiguda, Hyderabad",
+      "phone": "+91-9876543210",
+      "gstin": "36ABCDE1234F1Z5",
+      "email": "store@example.com"
+    },
+    "invoice": {
+      "number": "INV-2026-001234",
+      "date": "30/03/2026",
+      "time": "14:35",
+      "cashier": "Rishabh",
+      "paymentMethod": "Cash"
+    },
+    "customer": {
+      "name": "John Doe",
+      "phone": "+91-9123456789"
+    },
+    "items": [
+      {
+        "name": "Bedsheet King Size",
+        "variant": "Blue Floral / King",
+        "customisation": "Monogram: JD",
+        "quantity": 2,
+        "unitPrice": 1299.00,
+        "discount": 100.00,
+        "total": 2498.00
+      },
+      {
+        "name": "Towel Set Premium",
+        "variant": "White / Pack of 4",
+        "quantity": 1,
+        "unitPrice": 899.00,
+        "discount": 0,
+        "total": 899.00
+      },
+      {
+        "name": "Cotton Pillow Cover Pair Extra Soft Breathable",
+        "variant": "Grey / Standard",
+        "quantity": 3,
+        "unitPrice": 349.00,
+        "discount": 50.00,
+        "total": 997.00
+      }
+    ],
+    "summary": {
+      "subtotal": 4394.00,
+      "discount": 150.00,
+      "taxLabel": "GST",
+      "taxPercent": 5,
+      "taxAmount": 212.20,
+      "shipping": 0,
+      "roundOff": -0.20,
+      "total": 4456.00,
+      "amountPaid": 4500.00,
+      "change": 44.00
+    },
+    "footer": {
+      "message": "Thank you for shopping with us!",
+      "returnPolicy": "Exchange within 7 days with bill",
+      "website": "www.rishabhbombaydyeing.com"
+    }
+  }
+}
