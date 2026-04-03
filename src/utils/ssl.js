@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const selfsigned = require('selfsigned');
 const logger = require('./logger');
 
 const CERTS_DIR = path.join(__dirname, '../../config/certs');
@@ -9,7 +9,7 @@ const CERT_PATH = path.join(CERTS_DIR, 'server.crt');
 
 /**
  * Generate a self-signed certificate valid for local network IPs.
- * Uses openssl (available on macOS/Linux and Windows with Git).
+ * Uses selfsigned (pure JS, no openssl binary needed).
  */
 function generateCert() {
   if (!fs.existsSync(CERTS_DIR)) {
@@ -18,38 +18,46 @@ function generateCert() {
 
   logger.info('Generating self-signed SSL certificate for local network...');
 
-  // Build SAN entries for common local network ranges + localhost
-  const sanEntries = [
-    'DNS:localhost',
-    'IP:127.0.0.1',
-    'IP:0.0.0.0',
+  // Build SAN altNames for localhost + all local IPs
+  const altNames = [
+    { type: 2, value: 'localhost' },           // DNS
+    { type: 7, ip: '127.0.0.1' },              // IP
   ];
 
-  // Add the machine's actual local IPs
   const os = require('os');
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
       if (iface.family === 'IPv4' && !iface.internal) {
-        sanEntries.push(`IP:${iface.address}`);
+        altNames.push({ type: 7, ip: iface.address });
       }
     }
   }
 
-  const san = sanEntries.join(',');
-
   try {
-    execSync(
-      `openssl req -x509 -newkey rsa:2048 -nodes ` +
-      `-keyout "${KEY_PATH}" -out "${CERT_PATH}" ` +
-      `-days 3650 -subj "/CN=PrintAgent" ` +
-      `-addext "subjectAltName=${san}"`,
-      { stdio: 'pipe' }
+    const pems = selfsigned.generate(
+      [{ name: 'commonName', value: 'PrintAgent' }],
+      {
+        keySize: 2048,
+        days: 3650,
+        algorithm: 'sha256',
+        extensions: [
+          {
+            name: 'subjectAltName',
+            altNames,
+          },
+        ],
+      }
     );
-    logger.info(`SSL certificate generated (valid 10 years)`);
+
+    fs.writeFileSync(KEY_PATH, pems.private);
+    fs.writeFileSync(CERT_PATH, pems.cert);
+
+    const ipList = altNames.filter(a => a.ip).map(a => a.ip).join(', ');
+    logger.info('SSL certificate generated (valid 10 years)');
     logger.info(`  Key:  ${KEY_PATH}`);
     logger.info(`  Cert: ${CERT_PATH}`);
-    logger.info(`  SANs: ${san}`);
+    logger.info(`  IPs:  ${ipList}`);
     return true;
   } catch (err) {
     logger.error('Failed to generate SSL certificate:', err.message);
