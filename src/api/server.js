@@ -40,6 +40,11 @@ function createServer(config) {
         return callback(null, true);
       }
 
+      // Allow Popup webapp (POS runs on mypopup.shop subdomains)
+      if (origin.endsWith('.mypopup.shop') || origin.endsWith('.getpopup.in') || origin === 'https://mypopup.shop' || origin === 'https://getpopup.in') {
+        return callback(null, true);
+      }
+
       // Allow local network (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
       const localNetworkRegex = /(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)/;
       if (localNetworkRegex.test(origin)) {
