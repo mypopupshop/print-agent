@@ -196,36 +196,35 @@ async function startAPIServer(port, config) {
   const httpsPort = port + 1;
   try {
     const { loadOrCreateCert } = require('../utils/ssl');
+    logger.info('Loading SSL credentials...');
     const credentials = loadOrCreateCert();
     if (credentials) {
+      logger.info('SSL credentials loaded, starting HTTPS server...');
       const https = require('https');
       const httpsServer = https.createServer(credentials, app);
-      await new Promise((resolve, reject) => {
-        httpsServer.listen(httpsPort, '0.0.0.0', (err) => {
-          if (err) {
-            logger.warn('Failed to start HTTPS server:', err);
-            reject(err);
-          } else {
-            logger.info(`✓ HTTPS Server running on https://localhost:${httpsPort}`);
-            addresses.forEach(addr => {
-              logger.info(`✓ Secure access: https://${addr}:${httpsPort}`);
-            });
-            logger.info('  → Use this URL in POS settings for HTTPS pages');
-            logger.info('  → Visit the URL once in your browser to accept the certificate');
-            resolve(httpsServer);
-          }
+
+      await new Promise((resolve) => {
+        httpsServer.on('error', (err) => {
+          logger.warn(`HTTPS server error (port ${httpsPort}): ${err.message}`);
+          resolve(null);
         });
 
-        httpsServer.on('error', (err) => {
-          logger.warn(`HTTPS server error (port ${httpsPort}):`, err.message);
-          resolve(null); // Don't fail startup if HTTPS fails
+        httpsServer.listen(httpsPort, '0.0.0.0', () => {
+          logger.info(`✓ HTTPS Server running on https://localhost:${httpsPort}`);
+          addresses.forEach(addr => {
+            logger.info(`✓ Secure access: https://${addr}:${httpsPort}`);
+          });
+          logger.info('  → Use this URL in POS settings for HTTPS pages');
+          logger.info('  → Visit the URL once in your browser to accept the certificate');
+          resolve(httpsServer);
         });
       });
     } else {
       logger.warn('SSL certificate unavailable — HTTPS disabled');
     }
   } catch (err) {
-    logger.warn('HTTPS setup failed, continuing with HTTP only:', err.message);
+    logger.warn(`HTTPS setup failed, continuing with HTTP only: ${err.message}`);
+    logger.warn(err.stack);
   }
 
   return httpServer;
