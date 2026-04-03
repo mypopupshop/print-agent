@@ -146,56 +146,89 @@ function createServer(config) {
 }
 
 /**
- * Start API server
+ * Start API server (HTTP + HTTPS)
  * @param {number} port - Port to listen on
  * @param {Object} config - Application configuration
  * @returns {Promise<http.Server>} HTTP server instance
  */
 async function startAPIServer(port, config) {
   const app = createServer(config);
+  const os = require('os');
 
-  return new Promise((resolve, reject) => {
-    // Listen on all network interfaces (0.0.0.0) instead of just localhost
+  // Gather local IPs for logging
+  const addresses = [];
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        addresses.push(iface.address);
+      }
+    }
+  }
+
+  // Start HTTP server
+  const httpServer = await new Promise((resolve, reject) => {
     const server = app.listen(port, '0.0.0.0', (err) => {
       if (err) {
-        logger.error('Failed to start API server:', err);
+        logger.error('Failed to start HTTP server:', err);
         reject(err);
       } else {
-        const os = require('os');
-        const interfaces = os.networkInterfaces();
-
-        // Get local IP addresses
-        const addresses = [];
-        for (const name of Object.keys(interfaces)) {
-          for (const iface of interfaces[name]) {
-            // Skip internal and non-IPv4 addresses
-            if (iface.family === 'IPv4' && !iface.internal) {
-              addresses.push(iface.address);
-            }
-          }
-        }
-
-        logger.info(`✓ API Server running on http://localhost:${port}`);
-        if (addresses.length > 0) {
-          addresses.forEach(addr => {
-            logger.info(`✓ Network access: http://${addr}:${port}`);
-          });
-        }
+        logger.info(`✓ HTTP Server running on http://localhost:${port}`);
+        addresses.forEach(addr => {
+          logger.info(`✓ Network access: http://${addr}:${port}`);
+        });
         resolve(server);
       }
     });
 
-    // Handle server errors
     server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
         logger.error(`Port ${port} is already in use`);
         reject(new Error(`PORT_IN_USE: ${port}`));
       } else {
-        logger.error('Server error:', err);
+        logger.error('HTTP server error:', err);
         reject(err);
       }
     });
   });
+
+  // Start HTTPS server on port + 1 (e.g. 6320)
+  const httpsPort = port + 1;
+  try {
+    const { loadOrCreateCert } = require('../utils/ssl');
+    const credentials = loadOrCreateCert();
+    if (credentials) {
+      const https = require('https');
+      const httpsServer = https.createServer(credentials, app);
+      await new Promise((resolve, reject) => {
+        httpsServer.listen(httpsPort, '0.0.0.0', (err) => {
+          if (err) {
+            logger.warn('Failed to start HTTPS server:', err);
+            reject(err);
+          } else {
+            logger.info(`✓ HTTPS Server running on https://localhost:${httpsPort}`);
+            addresses.forEach(addr => {
+              logger.info(`✓ Secure access: https://${addr}:${httpsPort}`);
+            });
+            logger.info('  → Use this URL in POS settings for HTTPS pages');
+            logger.info('  → Visit the URL once in your browser to accept the certificate');
+            resolve(httpsServer);
+          }
+        });
+
+        httpsServer.on('error', (err) => {
+          logger.warn(`HTTPS server error (port ${httpsPort}):`, err.message);
+          resolve(null); // Don't fail startup if HTTPS fails
+        });
+      });
+    } else {
+      logger.warn('SSL certificate unavailable — HTTPS disabled');
+    }
+  } catch (err) {
+    logger.warn('HTTPS setup failed, continuing with HTTP only:', err.message);
+  }
+
+  return httpServer;
 }
 
 module.exports = { createServer, startAPIServer };
