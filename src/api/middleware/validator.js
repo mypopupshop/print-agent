@@ -12,7 +12,8 @@ const structuredReceiptSchema = Joi.object({
     address: Joi.string().max(96),
     phone: Joi.string().max(20),
     gstin: Joi.string().max(20),
-    email: Joi.string().max(48)
+    email: Joi.string().max(48),
+    logoUrl: Joi.string().uri().max(512).allow('', null)
   }),
   invoice: Joi.object({
     number: Joi.string().max(30),
@@ -49,7 +50,8 @@ const structuredReceiptSchema = Joi.object({
   footer: Joi.object({
     message: Joi.string().max(96),
     returnPolicy: Joi.string().max(96),
-    website: Joi.string().max(48)
+    website: Joi.string().max(48),
+    brandLogoUrl: Joi.string().uri().max(512).allow('', null)
   })
 });
 

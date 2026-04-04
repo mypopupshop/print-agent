@@ -1,4 +1,5 @@
 const { wrapText } = require('./text-wrapper');
+const { urlToEscposImage } = require('./image-printer');
 
 const ESC = 0x1B;
 const GS = 0x1D;
@@ -105,12 +106,24 @@ function formatMoney(num) {
   return Number(num).toFixed(2);
 }
 
-function formatReceipt(data) {
+async function formatReceipt(data) {
   const r = new ReceiptBuilder(data.paperWidth || 48);
   const w = r.width;
+  // Max pixel width: 80mm paper ≈ 384px at 203dpi, 58mm ≈ 384 for 48-col
+  const imgMaxWidth = w === 42 ? 320 : 384;
 
   r.initialize();
   r.newline();
+
+  // ===== STORE LOGO =====
+  if (data.store && data.store.logoUrl) {
+    const logoBytes = await urlToEscposImage(data.store.logoUrl, imgMaxWidth);
+    if (logoBytes) {
+      r.alignCenter();
+      r.bytes.push(...logoBytes);
+      r.newline();
+    }
+  }
 
   // ===== STORE HEADER =====
   if (data.store) {
@@ -293,6 +306,16 @@ function formatReceipt(data) {
     if (data.footer.message) r.textLine(data.footer.message);
     if (data.footer.returnPolicy) r.textLine(data.footer.returnPolicy);
     if (data.footer.website) r.textLine(data.footer.website);
+
+    // Brand logo (e.g. "Powered by Popup" logo)
+    if (data.footer.brandLogoUrl) {
+      r.newline();
+      const brandBytes = await urlToEscposImage(data.footer.brandLogoUrl, Math.floor(imgMaxWidth * 0.5));
+      if (brandBytes) {
+        r.bytes.push(...brandBytes);
+        r.newline();
+      }
+    }
   }
 
   // Final separator and cut
