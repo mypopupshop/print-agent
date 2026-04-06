@@ -711,10 +711,10 @@ function renderJobHistory(jobs) {
 
     return `
       <div class="job-item">
-        <div>
+        <div class="job-info">
           <div class="job-id">${escapeHtml(job.jobId)}</div>
-          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
-            ${escapeHtml(job.printerType)} • ${timestamp} ${job.duration ? `• ${duration}` : ''}
+          <div class="job-meta">
+            ${escapeHtml(job.printerType)} &bull; ${timestamp} ${job.duration ? `&bull; ${duration}` : ''}
           </div>
         </div>
         <div class="job-status ${job.status}">${job.status}</div>

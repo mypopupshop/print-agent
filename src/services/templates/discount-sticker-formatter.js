@@ -5,6 +5,7 @@
  */
 
 const { wrapText } = require('./text-wrapper');
+const { sanitizeCode128 } = require('../../utils/barcode');
 
 // 60mm x 40mm at 8 dots/mm
 const LABEL_WIDTH = 480;
@@ -98,8 +99,9 @@ function formatDiscountSticker(data) {
   const bottomLimit = LABEL_HEIGHT - M;
   const barcodeH = Math.max(25, bottomLimit - y - 45);
 
-  // Barcode — left side, human readable text below (same as non-discount)
-  c.push(`BARCODE ${M},${y},"128",${barcodeH},1,0,2,3,"${barcode}"`);
+  // Barcode — left side, human readable text below (Code 128)
+  const safeBarcode = sanitizeCode128(barcode);
+  c.push(`BARCODE ${M},${y},"128",${barcodeH},1,0,2,3,"${safeBarcode}"`);
 
   // Right column: VStack of MRP, discount%, discounted price — vertically centered with barcode
   const rightColX = LABEL_WIDTH - M;

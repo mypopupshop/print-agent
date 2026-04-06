@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const logger = require('../../utils/logger');
+const { CODE128_PATTERN } = require('../../utils/barcode');
 
 /**
  * Structured receipt schema for formatted sale receipts
@@ -86,7 +87,8 @@ const schemas = {
     ).required(),
     company_name: Joi.string().max(40).default('M/s RISHABH BOMBAY DYEING'),
     company_description: Joi.string().max(50).default('Habsiguda, Hyderabad'),
-    barcode: Joi.string().max(20).required(),
+    barcode: Joi.string().max(48).pattern(CODE128_PATTERN).required()
+      .messages({ 'string.pattern.base': 'Barcode must contain only printable ASCII characters (Code 128), no double-quotes' }),
     copies: Joi.number().integer().min(1).max(100).default(1),
     printer: Joi.string().optional()
   }),
@@ -109,7 +111,8 @@ const schemas = {
     ).required(),
     company_name: Joi.string().max(40).default('M/s RISHABH BOMBAY DYEING'),
     company_description: Joi.string().max(50).default('Habsiguda, Hyderabad'),
-    barcode: Joi.string().max(20).required(),
+    barcode: Joi.string().max(48).pattern(CODE128_PATTERN).required()
+      .messages({ 'string.pattern.base': 'Barcode must contain only printable ASCII characters (Code 128), no double-quotes' }),
     copies: Joi.number().integer().min(1).max(100).default(1),
     printer: Joi.string().optional()
   }),

@@ -2,14 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Print Agent Dashboard</title>
   <link rel="stylesheet" href="/css/dashboard.css">
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>🖨️ Silent Print Agent Dashboard</h1>
+      <h1>Print Agent</h1>
       <div class="status-bar">
         <span class="status-item" id="api-status">
           <span class="status-dot"></span>
@@ -28,11 +31,11 @@
 
     <nav class="tabs">
       <button class="tab active" data-tab="overview">Overview</button>
-      <button class="tab" data-tab="receipt">Receipt Printer</button>
-      <button class="tab" data-tab="sticker">Sticker Label</button>
-      <button class="tab" data-tab="discount-sticker">Discounted Sticker</button>
-      <button class="tab" data-tab="a4">A4 Printer</button>
-      <button class="tab" data-tab="history">Job History</button>
+      <button class="tab" data-tab="receipt">Receipt</button>
+      <button class="tab" data-tab="sticker">Sticker</button>
+      <button class="tab" data-tab="discount-sticker">Discount</button>
+      <button class="tab" data-tab="a4">A4</button>
+      <button class="tab" data-tab="history">History</button>
     </nav>
 
     <!-- Overview Tab -->
@@ -91,14 +94,14 @@
           </div>
 
           <h3>Receipt Data</h3>
-          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">
+          <p class="helper-text">
             Paste structured receipt JSON or raw ESC/POS commands
           </p>
           <textarea
             id="receipt-data"
             class="data-input"
             placeholder='{"type":"structured","store":{...},"items":[...],"summary":{...}}'
-            rows="16"
+            rows="12"
             style="font-family: monospace; font-size: 12px;"
           ></textarea>
 
@@ -128,7 +131,7 @@
 
         <div class="control-section">
           <h3>Sticker Label Details</h3>
-          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+          <p class="helper-text">
             Print a 60mm x 40mm sticker label on the TSC TTP-244 Pro
           </p>
 
@@ -169,12 +172,12 @@
             </div>
           </div>
 
-          <div class="button-group" style="margin-top: 16px;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+          <div class="copies-row">
+            <label class="copies-label">
               Copies:
-              <input type="number" id="sticker-copies" min="1" max="100" value="1" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 6px;">
+              <input type="number" id="sticker-copies" min="1" max="100" value="1" class="copies-input">
             </label>
-            <button class="btn-success" id="print-sticker" style="flex: 2;">Print Sticker</button>
+            <button class="btn-success" id="print-sticker" style="flex: 1;">Print Sticker</button>
           </div>
 
           <div id="sticker-result" class="result-message"></div>
@@ -197,8 +200,8 @@
         </div>
 
         <div class="control-section">
-          <h3>Discounted Sticker Label Details</h3>
-          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+          <h3>Discounted Sticker Label</h3>
+          <p class="helper-text">
             Print a 60mm x 40mm discounted sticker label on the TSC TTP-244 Pro
           </p>
 
@@ -249,12 +252,12 @@
             </div>
           </div>
 
-          <div class="button-group" style="margin-top: 16px;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+          <div class="copies-row">
+            <label class="copies-label">
               Copies:
-              <input type="number" id="discount-sticker-copies" min="1" max="100" value="1" style="width: 60px; padding: 8px; border: 1px solid var(--border); border-radius: 6px;">
+              <input type="number" id="discount-sticker-copies" min="1" max="100" value="1" class="copies-input">
             </label>
-            <button class="btn-success" id="print-discount-sticker" style="flex: 2;">Print Discounted Sticker</button>
+            <button class="btn-success" id="print-discount-sticker" style="flex: 1;">Print Discounted Sticker</button>
           </div>
 
           <div id="discount-sticker-result" class="result-message"></div>
@@ -296,7 +299,7 @@
             id="a4-data"
             class="data-input"
             placeholder="Enter HTML content or base64 PDF data"
-            rows="12"
+            rows="10"
           ></textarea>
 
           <div class="button-group">
