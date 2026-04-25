@@ -6,14 +6,29 @@
     "auditLog": "C:\\Users\\risha\\Software\\print-agent\\logs\\.803a81ebb8fc7b8c20e2da0cacd06f8a2ceaaf9d-audit.json",
     "files": [
         {
-            "date": 1774084064366,
-            "name": "C:\\Users\\risha\\Software\\print-agent\\logs\\print-agent-2026-03-21.log",
-            "hash": "077e4184252b775f46a35ef10ef1b1f85fa5fc4c67e3e9f78a6b9c955cb80bb6"
+            "date": 1776090693918,
+            "name": "C:\\Users\\risha\\Software\\print-agent\\logs\\print-agent-2026-04-13.log",
+            "hash": "123d83193dd8beeb1deb77905583d8ad59a35db4f9484ddb59df8dd0afacb137"
         },
         {
-            "date": 1774847499815,
-            "name": "C:\\Users\\risha\\Software\\print-agent\\logs\\print-agent-2026-03-30.log",
-            "hash": "eafec63e20d8c830549aa0ce9948ad23ac6d86a35bf8753bbe305a6e79b70241"
+            "date": 1776435242957,
+            "name": "C:\\Users\\risha\\Software\\print-agent\\logs\\print-agent-2026-04-17.log",
+            "hash": "a1d66e193a6ca78fcf141857f9134627c460fcc516158a0b64645376deb7ca5d"
+        },
+        {
+            "date": 1776672079854,
+            "name": "C:\\Users\\risha\\Software\\print-agent\\logs\\print-agent-2026-04-20.log",
+            "hash": "66a9965eb6797a9d6b4627f7c18720c79dcb4d64ff832ee31f1e24ec149c26d7"
+        },
+        {
+            "date": 1776867648436,
+            "name": "C:\\Users\\risha\\Software\\print-agent\\logs\\print-agent-2026-04-22.log",
+            "hash": "1287b8c2894add805a83cb3b0efda013bfd1025b2f4376848dcdbc80de6eedd0"
+        },
+        {
+            "date": 1777102769158,
+            "name": "C:\\Users\\risha\\Software\\print-agent\\logs\\print-agent-2026-04-25.log",
+            "hash": "840a1eaba8b18837d969c7f9a79cf13ecab7d8d8ed8c50fba1eaef7cd8e5969d"
         }
     ],
     "hashType": "sha256"

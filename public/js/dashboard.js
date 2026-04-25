@@ -197,6 +197,13 @@ const TEMPLATES = {
 // State
 let currentJobHistory = [];
 let statusInterval = null;
+
+// Bulk labels state
+let bulkRows = [];
+let bulkPrintAbort = false;
+let bulkRowIdCounter = 0;
+let bulkPrinting = false;
+const BULK_CODE128_PATTERN = /^[\x20-\x21\x23-\x7e]+$/;
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
   initializeTabs();
@@ -254,6 +261,8 @@ function initializeButtons() {
   document.getElementById('print-discount-sticker').addEventListener('click', () => printDiscountSticker());
   attachDiscountStickerPreviewListeners();
 
+  // Bulk labels
+  initializeBulkLabels();
 }
 
 // Load template into textarea
@@ -1060,6 +1069,472 @@ async function printDiscountSticker() {
   } catch (error) {
     showResult(resultDiv, 'error', `Network error: ${error.message}`);
   }
+}
+
+// ===== Bulk Label Functions =====
+
+function initializeBulkLabels() {
+  document.getElementById('bulk-add-row').addEventListener('click', () => bulkAddRow());
+  document.getElementById('bulk-load-sample').addEventListener('click', () => bulkLoadSample());
+  document.getElementById('bulk-clear-all').addEventListener('click', () => bulkClearAll());
+  document.getElementById('bulk-validate').addEventListener('click', () => bulkValidateAll());
+  document.getElementById('bulk-print-all').addEventListener('click', () => bulkPrintAll());
+
+  // Event delegation on table body
+  const tbody = document.getElementById('bulk-table-body');
+
+  tbody.addEventListener('input', (e) => {
+    const input = e.target;
+    const rowId = parseInt(input.dataset.rowId);
+    const field = input.dataset.field;
+    if (isNaN(rowId) || !field) return;
+
+    bulkUpdateRowData(rowId, field, input.value);
+
+    // Clear error on this cell
+    const td = input.closest('td');
+    if (td) {
+      td.classList.remove('bulk-cell-error');
+      td.removeAttribute('data-error');
+    }
+  });
+
+  tbody.addEventListener('change', (e) => {
+    if (e.target.tagName === 'SELECT' && e.target.dataset.field === 'type') {
+      const rowId = parseInt(e.target.dataset.rowId);
+      bulkOnTypeChange(rowId, e.target.value);
+    }
+  });
+
+  tbody.addEventListener('click', (e) => {
+    const btn = e.target.closest('.bulk-delete-btn');
+    if (btn) {
+      const rowId = parseInt(btn.dataset.rowId);
+      bulkDeleteRow(rowId);
+    }
+  });
+
+  // Seed with 5 empty rows
+  for (let i = 0; i < 5; i++) bulkAddRow();
+}
+
+function bulkAddRow(data) {
+  const id = ++bulkRowIdCounter;
+  const row = {
+    id,
+    type: (data && data.type) || 'regular',
+    product_name: (data && data.product_name) || '',
+    description: (data && data.description) || '',
+    size: (data && data.size) || '',
+    price: (data && data.price) || '',
+    offer_percentage: (data && data.offer_percentage) || '',
+    barcode: (data && data.barcode) || '',
+    copies: (data && data.copies) || 1,
+    status: 'idle',
+    errors: {}
+  };
+  bulkRows.push(row);
+  bulkRenderRow(row);
+  bulkUpdateRowCount();
+  return row;
+}
+
+function bulkRenderRow(row) {
+  const tbody = document.getElementById('bulk-table-body');
+  const tr = document.createElement('tr');
+  tr.id = `bulk-row-${row.id}`;
+
+  const rowNum = bulkRows.indexOf(row) + 1;
+  const isDiscount = row.type === 'discounted';
+
+  let offerCellContent;
+  if (isDiscount) {
+    const calcPrice = bulkCalcDiscountedPrice(row.price, row.offer_percentage);
+    offerCellContent = `<div class="bulk-offer-cell">
+      <input type="number" min="1" max="99" data-row-id="${row.id}" data-field="offer_percentage" value="${escapeHtml(row.offer_percentage)}" placeholder="%">
+      <span class="calc-price">${calcPrice ? '= Rs. ' + calcPrice + '/-' : ''}</span>
+    </div>`;
+  } else {
+    offerCellContent = `<div class="bulk-offer-dash">&mdash;</div>`;
+  }
+
+  tr.innerHTML = `
+    <td style="text-align:center"><button class="bulk-delete-btn" data-row-id="${row.id}">&times;</button></td>
+    <td class="bulk-row-num">${rowNum}</td>
+    <td><select data-row-id="${row.id}" data-field="type">
+      <option value="regular"${row.type === 'regular' ? ' selected' : ''}>Regular</option>
+      <option value="discounted"${row.type === 'discounted' ? ' selected' : ''}>Discounted</option>
+    </select></td>
+    <td><input type="text" data-row-id="${row.id}" data-field="product_name" value="${escapeHtml(row.product_name)}" placeholder="Product name" maxlength="60"></td>
+    <td><input type="text" data-row-id="${row.id}" data-field="description" value="${escapeHtml(row.description)}" placeholder="Description" maxlength="120"></td>
+    <td><input type="text" data-row-id="${row.id}" data-field="size" value="${escapeHtml(row.size)}" placeholder="Size" maxlength="20"></td>
+    <td><input type="text" data-row-id="${row.id}" data-field="price" value="${escapeHtml(row.price)}" placeholder="Price"></td>
+    <td class="bulk-offer-td">${offerCellContent}</td>
+    <td><input type="text" data-row-id="${row.id}" data-field="barcode" value="${escapeHtml(row.barcode)}" placeholder="Barcode" maxlength="48"></td>
+    <td><input type="number" min="1" max="100" data-row-id="${row.id}" data-field="copies" value="${row.copies}" style="width:56px"></td>
+    <td><div class="bulk-status-cell"><span class="bulk-status-dot ${row.status}"></span></div></td>
+  `;
+
+  tbody.appendChild(tr);
+}
+
+function bulkDeleteRow(rowId) {
+  bulkRows = bulkRows.filter(r => r.id !== rowId);
+  const tr = document.getElementById(`bulk-row-${rowId}`);
+  if (tr) tr.remove();
+  bulkRenumberRows();
+  bulkUpdateRowCount();
+}
+
+function bulkRenumberRows() {
+  const tbody = document.getElementById('bulk-table-body');
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach((tr, i) => {
+    const numCell = tr.querySelector('.bulk-row-num');
+    if (numCell) numCell.textContent = i + 1;
+  });
+}
+
+function bulkUpdateRowCount() {
+  document.getElementById('bulk-row-count').textContent = `${bulkRows.length} row${bulkRows.length !== 1 ? 's' : ''}`;
+}
+
+function bulkUpdateRowData(rowId, field, value) {
+  const row = bulkRows.find(r => r.id === rowId);
+  if (!row) return;
+
+  if (field === 'copies') {
+    row.copies = parseInt(value) || 1;
+  } else {
+    row[field] = value;
+  }
+
+  // Auto-calc discounted price display
+  if ((field === 'price' || field === 'offer_percentage') && row.type === 'discounted') {
+    const tr = document.getElementById(`bulk-row-${rowId}`);
+    if (tr) {
+      const calcSpan = tr.querySelector('.calc-price');
+      if (calcSpan) {
+        const calc = bulkCalcDiscountedPrice(row.price, row.offer_percentage);
+        calcSpan.textContent = calc ? `= Rs. ${calc}/-` : '';
+      }
+    }
+  }
+}
+
+function bulkCalcDiscountedPrice(price, offerPct) {
+  const p = parseFloat(price);
+  const o = parseFloat(offerPct);
+  if (!isNaN(p) && !isNaN(o) && o > 0 && o < 100) {
+    return Math.round(p - (p * o / 100));
+  }
+  return null;
+}
+
+function bulkOnTypeChange(rowId, type) {
+  const row = bulkRows.find(r => r.id === rowId);
+  if (!row) return;
+  row.type = type;
+
+  const tr = document.getElementById(`bulk-row-${rowId}`);
+  if (!tr) return;
+
+  const offerTd = tr.querySelector('.bulk-offer-td');
+  if (!offerTd) return;
+
+  if (type === 'discounted') {
+    const calcPrice = bulkCalcDiscountedPrice(row.price, row.offer_percentage);
+    offerTd.innerHTML = `<div class="bulk-offer-cell">
+      <input type="number" min="1" max="99" data-row-id="${row.id}" data-field="offer_percentage" value="${escapeHtml(row.offer_percentage)}" placeholder="%">
+      <span class="calc-price">${calcPrice ? '= Rs. ' + calcPrice + '/-' : ''}</span>
+    </div>`;
+  } else {
+    row.offer_percentage = '';
+    offerTd.innerHTML = `<div class="bulk-offer-dash">&mdash;</div>`;
+  }
+
+  // Clear any error on the offer cell
+  offerTd.classList.remove('bulk-cell-error');
+  offerTd.removeAttribute('data-error');
+}
+
+function bulkIsRowEmpty(row) {
+  return !row.product_name && !row.description && !row.size && !row.price && !row.offer_percentage && !row.barcode;
+}
+
+function bulkValidateRow(row) {
+  const errors = {};
+
+  if (!row.product_name.trim()) {
+    errors.product_name = 'Required';
+  } else if (row.product_name.length > 60) {
+    errors.product_name = 'Max 60 chars';
+  }
+
+  if (!row.price.toString().trim()) {
+    errors.price = 'Required';
+  } else if (isNaN(parseFloat(row.price))) {
+    errors.price = 'Must be a number';
+  }
+
+  if (!row.barcode.trim()) {
+    errors.barcode = 'Required';
+  } else if (row.barcode.length > 48) {
+    errors.barcode = 'Max 48 chars';
+  } else if (!BULK_CODE128_PATTERN.test(row.barcode)) {
+    errors.barcode = 'Invalid Code128 chars';
+  }
+
+  const copies = parseInt(row.copies);
+  if (isNaN(copies) || copies < 1 || copies > 100) {
+    errors.copies = '1-100';
+  }
+
+  if (row.type === 'discounted') {
+    const offerPct = parseFloat(row.offer_percentage);
+    if (!row.offer_percentage.toString().trim()) {
+      errors.offer_percentage = 'Required';
+    } else if (isNaN(offerPct) || offerPct < 1 || offerPct > 99) {
+      errors.offer_percentage = 'Must be 1-99';
+    }
+
+    if (!errors.price && !errors.offer_percentage) {
+      const calc = bulkCalcDiscountedPrice(row.price, row.offer_percentage);
+      if (calc === null) {
+        errors.offer_percentage = 'Cannot calculate discount';
+      }
+    }
+  }
+
+  row.errors = errors;
+  return { valid: Object.keys(errors).length === 0, errors };
+}
+
+function bulkValidateAll() {
+  bulkClearValidation();
+
+  const nonEmptyRows = bulkRows.filter(r => !bulkIsRowEmpty(r));
+
+  if (nonEmptyRows.length === 0) {
+    showResult(document.getElementById('bulk-result'), 'error', 'No rows to validate. Fill in at least one row.');
+    return { valid: false, validCount: 0, invalidCount: 0, nonEmptyRows: [] };
+  }
+
+  let invalidCount = 0;
+
+  nonEmptyRows.forEach(row => {
+    const { valid, errors } = bulkValidateRow(row);
+    const tr = document.getElementById(`bulk-row-${row.id}`);
+    if (!tr) return;
+
+    if (!valid) {
+      invalidCount++;
+      row.status = 'error';
+
+      // Highlight error cells
+      const fieldToCol = {
+        product_name: 3, price: 6, offer_percentage: 7, barcode: 8, copies: 9
+      };
+
+      for (const [field, msg] of Object.entries(errors)) {
+        const colIdx = fieldToCol[field];
+        if (colIdx !== undefined) {
+          const td = tr.children[colIdx];
+          if (td) {
+            td.classList.add('bulk-cell-error');
+            td.setAttribute('data-error', msg);
+          }
+        }
+      }
+    } else {
+      row.status = 'idle';
+    }
+
+    // Update status dot
+    const dot = tr.querySelector('.bulk-status-dot');
+    if (dot) {
+      dot.className = `bulk-status-dot ${row.status}`;
+    }
+  });
+
+  const validCount = nonEmptyRows.length - invalidCount;
+  const resultDiv = document.getElementById('bulk-result');
+
+  if (invalidCount > 0) {
+    showResult(resultDiv, 'error', `${invalidCount} row${invalidCount > 1 ? 's have' : ' has'} errors. Hover over red cells for details.`);
+  } else {
+    showResult(resultDiv, 'success', `All ${validCount} row${validCount > 1 ? 's are' : ' is'} valid and ready to print.`);
+  }
+
+  return { valid: invalidCount === 0, validCount, invalidCount, nonEmptyRows };
+}
+
+function bulkClearValidation() {
+  const tbody = document.getElementById('bulk-table-body');
+  tbody.querySelectorAll('.bulk-cell-error').forEach(td => {
+    td.classList.remove('bulk-cell-error');
+    td.removeAttribute('data-error');
+  });
+
+  bulkRows.forEach(row => {
+    row.status = 'idle';
+    row.errors = {};
+    const tr = document.getElementById(`bulk-row-${row.id}`);
+    if (tr) {
+      const dot = tr.querySelector('.bulk-status-dot');
+      if (dot) dot.className = 'bulk-status-dot';
+    }
+  });
+}
+
+async function bulkPrintAll() {
+  if (bulkPrinting) return;
+
+  const result = bulkValidateAll();
+  if (!result.valid || result.nonEmptyRows.length === 0) return;
+
+  const rows = result.nonEmptyRows;
+  bulkPrinting = true;
+  bulkPrintAbort = false;
+
+  const printBtn = document.getElementById('bulk-print-all');
+  const validateBtn = document.getElementById('bulk-validate');
+  printBtn.disabled = true;
+  validateBtn.disabled = true;
+
+  const progressDiv = document.getElementById('bulk-progress');
+  const progressFill = document.getElementById('bulk-progress-fill');
+  const progressText = document.getElementById('bulk-progress-text');
+  progressDiv.style.display = 'flex';
+  progressFill.style.width = '0%';
+
+  const companyName = document.getElementById('bulk-company_name').value;
+  const companyDesc = document.getElementById('bulk-company_description').value;
+
+  let doneCount = 0;
+  let failCount = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    if (bulkPrintAbort) break;
+
+    const row = rows[i];
+    row.status = 'sending';
+    bulkUpdateRowStatus(row.id, 'sending');
+    progressText.textContent = `Printing ${i + 1} of ${rows.length}...`;
+    progressFill.style.width = `${((i) / rows.length) * 100}%`;
+
+    try {
+      let endpoint, payload;
+
+      if (row.type === 'discounted') {
+        endpoint = `${API_BASE}/print/discount-sticker`;
+        const discountedPrice = bulkCalcDiscountedPrice(row.price, row.offer_percentage);
+        payload = {
+          product_name: row.product_name.trim(),
+          description: row.description.trim(),
+          size: row.size.trim(),
+          price: row.price.trim(),
+          offer_percentage: row.offer_percentage.toString().trim(),
+          discounted_price: String(discountedPrice),
+          barcode: row.barcode.trim(),
+          copies: parseInt(row.copies) || 1,
+          company_name: companyName,
+          company_description: companyDesc
+        };
+      } else {
+        endpoint = `${API_BASE}/print/sticker`;
+        payload = {
+          product_name: row.product_name.trim(),
+          description: row.description.trim(),
+          size: row.size.trim(),
+          price: row.price.trim(),
+          barcode: row.barcode.trim(),
+          copies: parseInt(row.copies) || 1,
+          company_name: companyName,
+          company_description: companyDesc
+        };
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.status === 'ok') {
+        row.status = 'done';
+        bulkUpdateRowStatus(row.id, 'done');
+        doneCount++;
+      } else {
+        row.status = 'failed';
+        bulkUpdateRowStatus(row.id, 'failed');
+        failCount++;
+      }
+    } catch (error) {
+      row.status = 'failed';
+      bulkUpdateRowStatus(row.id, 'failed');
+      failCount++;
+    }
+
+    progressFill.style.width = `${((i + 1) / rows.length) * 100}%`;
+  }
+
+  // Done
+  bulkPrinting = false;
+  printBtn.disabled = false;
+  validateBtn.disabled = false;
+
+  const resultDiv = document.getElementById('bulk-result');
+  if (failCount === 0) {
+    progressText.textContent = `Done! ${doneCount} printed`;
+    showResult(resultDiv, 'success', `All ${doneCount} label${doneCount > 1 ? 's' : ''} sent to printer successfully.`);
+  } else {
+    progressText.textContent = `Done: ${doneCount} ok, ${failCount} failed`;
+    showResult(resultDiv, 'error', `${doneCount} printed, ${failCount} failed. Fix failed rows and retry.`);
+  }
+
+  setTimeout(() => {
+    loadQueueStats();
+    loadJobHistory();
+  }, 500);
+}
+
+function bulkUpdateRowStatus(rowId, status) {
+  const tr = document.getElementById(`bulk-row-${rowId}`);
+  if (!tr) return;
+  const dot = tr.querySelector('.bulk-status-dot');
+  if (dot) dot.className = `bulk-status-dot ${status}`;
+}
+
+function bulkLoadSample() {
+  bulkClearAll();
+
+  const samples = [
+    { type: 'regular', product_name: 'Bedsheet King Size Premium', description: '100% Cotton, 300 TC', size: 'King', price: '1299', barcode: '8901234567890', copies: 2 },
+    { type: 'discounted', product_name: 'Towel Set Luxury', description: 'Egyptian Cotton, Pack of 4', size: 'Large', price: '1599', offer_percentage: '25', barcode: '8901234567891', copies: 3 },
+    { type: 'discounted', product_name: 'Pillow Cover Pair', description: 'Satin Finish, Zipper', size: 'Standard', price: '499', offer_percentage: '15', barcode: '8901234567892', copies: 5 },
+  ];
+
+  samples.forEach(s => bulkAddRow(s));
+}
+
+function bulkClearAll() {
+  bulkRows = [];
+  document.getElementById('bulk-table-body').innerHTML = '';
+  bulkRowIdCounter = 0;
+
+  // Hide progress
+  document.getElementById('bulk-progress').style.display = 'none';
+
+  // Clear result
+  const resultDiv = document.getElementById('bulk-result');
+  resultDiv.className = 'result-message';
+  resultDiv.textContent = '';
+
+  // Seed 5 empty rows
+  for (let i = 0; i < 5; i++) bulkAddRow();
 }
 
 // Cleanup on page unload

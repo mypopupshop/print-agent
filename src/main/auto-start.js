@@ -1,89 +1,106 @@
-const AutoLaunch = require('auto-launch');
+const { app } = require('electron');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const path = require('path');
 const logger = require('../utils/logger');
 
-let autoLauncher = null;
+const execFileAsync = promisify(execFile);
 
-/**
- * Initialize auto-launch configuration
- */
-function initializeAutoLaunch() {
-  autoLauncher = new AutoLaunch({
-    name: 'PrintAgent',
-    path: process.execPath,
-    isHidden: false, // Start visible to tray
-  });
+const TASK_NAME = 'PrintAgent';
 
-  return autoLauncher;
+function runPowerShell(script) {
+  return execFileAsync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+    { windowsHide: true }
+  );
 }
 
-/**
- * Register application for auto-start on system boot
- */
+// PowerShell single-quoted strings only need '' to escape a single quote.
+function psQuote(value) {
+  return String(value).replace(/'/g, "''");
+}
+
+async function getRegisteredTaskPath() {
+  try {
+    const { stdout } = await runPowerShell(
+      `(Get-ScheduledTask -TaskName '${psQuote(TASK_NAME)}' -ErrorAction Stop).Actions[0].Execute`
+    );
+    const trimmed = stdout.trim();
+    return trimmed || null;
+  } catch {
+    return null;
+  }
+}
+
 async function registerAutoStart() {
+  if (process.platform !== 'win32') {
+    logger.info('Auto-start: not Windows, skipping');
+    return false;
+  }
+
+  // Don't pollute the user's Task Scheduler with a path to dev electron.exe.
+  if (!app.isPackaged) {
+    logger.info('Auto-start: dev mode, skipping registration');
+    return false;
+  }
+
+  const exePath = process.execPath;
+  const workingDir = path.dirname(exePath);
+
   try {
-    if (!autoLauncher) {
-      initializeAutoLaunch();
+    const existing = await getRegisteredTaskPath();
+    if (existing && existing.toLowerCase() === exePath.toLowerCase()) {
+      logger.info(`Auto-start: already registered (${exePath})`);
+      return true;
     }
 
-    // Check if already enabled
-    const isEnabled = await autoLauncher.isEnabled();
-
-    if (!isEnabled) {
-      await autoLauncher.enable();
-      logger.info('Auto-start registered successfully');
+    if (existing) {
+      logger.info(`Auto-start: path changed (${existing} -> ${exePath}), re-registering`);
     } else {
-      logger.info('Auto-start already enabled');
+      logger.info(`Auto-start: registering scheduled task '${TASK_NAME}' for ${exePath}`);
     }
 
-    return true;
+    const script = [
+      `$action = New-ScheduledTaskAction -Execute '${psQuote(exePath)}' -WorkingDirectory '${psQuote(workingDir)}'`,
+      `$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME`,
+      `$settings = New-ScheduledTaskSettingsSet -Hidden -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Seconds 0) -MultipleInstances IgnoreNew -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)`,
+      `$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited`,
+      `Register-ScheduledTask -TaskName '${psQuote(TASK_NAME)}' -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null`
+    ].join('; ');
 
+    await runPowerShell(script);
+    logger.info('Auto-start: registered successfully');
+    return true;
   } catch (error) {
-    logger.error('Failed to register auto-start:', error);
-    // Don't fail the app if auto-start registration fails
+    logger.error('Auto-start: failed to register', {
+      error: error.message,
+      stderr: error.stderr && error.stderr.toString()
+    });
     return false;
   }
 }
 
-/**
- * Disable auto-start
- */
 async function disableAutoStart() {
+  if (process.platform !== 'win32') return false;
   try {
-    if (!autoLauncher) {
-      initializeAutoLaunch();
-    }
-
-    const isEnabled = await autoLauncher.isEnabled();
-
-    if (isEnabled) {
-      await autoLauncher.disable();
-      logger.info('Auto-start disabled');
-    }
-
+    await runPowerShell(
+      `Unregister-ScheduledTask -TaskName '${psQuote(TASK_NAME)}' -Confirm:$false -ErrorAction Stop`
+    );
+    logger.info('Auto-start: scheduled task removed');
     return true;
-
   } catch (error) {
-    logger.error('Failed to disable auto-start:', error);
+    logger.error('Auto-start: failed to disable', {
+      error: error.message,
+      stderr: error.stderr && error.stderr.toString()
+    });
     return false;
   }
 }
 
-/**
- * Check if auto-start is enabled
- * @returns {Promise<boolean>}
- */
 async function isAutoStartEnabled() {
-  try {
-    if (!autoLauncher) {
-      initializeAutoLaunch();
-    }
-
-    return await autoLauncher.isEnabled();
-
-  } catch (error) {
-    logger.error('Failed to check auto-start status:', error);
-    return false;
-  }
+  if (process.platform !== 'win32') return false;
+  return (await getRegisteredTaskPath()) !== null;
 }
 
 module.exports = {

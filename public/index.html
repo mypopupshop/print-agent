@@ -34,6 +34,7 @@
       <button class="tab" data-tab="receipt">Receipt</button>
       <button class="tab" data-tab="sticker">Sticker</button>
       <button class="tab" data-tab="discount-sticker">Discount</button>
+      <button class="tab" data-tab="bulk-labels">Bulk Labels</button>
       <button class="tab" data-tab="a4">A4</button>
       <button class="tab" data-tab="history">History</button>
     </nav>
@@ -262,6 +263,73 @@
 
           <div id="discount-sticker-result" class="result-message"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- Bulk Labels Tab -->
+    <div class="tab-content" id="bulk-labels-tab">
+      <div class="card">
+        <h3>Bulk Label Printing</h3>
+        <p class="helper-text">
+          Enter multiple labels in the spreadsheet below. Each row is a separate print job sent to the TSC printer.
+        </p>
+
+        <div class="bulk-controls-top">
+          <div class="bulk-global-fields">
+            <div class="template-field">
+              <label>Company Name</label>
+              <input type="text" id="bulk-company_name" value="M/s RISHABH BOMBAY DYEING" readonly style="opacity: 0.7; cursor: not-allowed;">
+            </div>
+            <div class="template-field">
+              <label>Company Description</label>
+              <input type="text" id="bulk-company_description" value="Habsiguda, Hyderabad" readonly style="opacity: 0.7; cursor: not-allowed;">
+            </div>
+          </div>
+          <div class="bulk-actions-top">
+            <button class="btn-template" id="bulk-add-row">+ Add Row</button>
+            <button class="btn-template" id="bulk-load-sample">Load Sample</button>
+            <button class="btn-template" id="bulk-clear-all">Clear All</button>
+          </div>
+        </div>
+
+        <div id="bulk-progress" class="bulk-progress" style="display: none;">
+          <div class="bulk-progress-bar-container">
+            <div id="bulk-progress-fill" class="bulk-progress-fill"></div>
+          </div>
+          <span id="bulk-progress-text" class="bulk-progress-text">0 / 0</span>
+        </div>
+
+        <div class="bulk-table-wrapper">
+          <table class="bulk-table" id="bulk-table">
+            <thead>
+              <tr>
+                <th class="bulk-col-delete"></th>
+                <th class="bulk-col-num">#</th>
+                <th class="bulk-col-type">Type</th>
+                <th class="bulk-col-product">Product Name *</th>
+                <th class="bulk-col-desc">Description</th>
+                <th class="bulk-col-size">Size</th>
+                <th class="bulk-col-price">Price *</th>
+                <th class="bulk-col-offer">Offer % / Disc.</th>
+                <th class="bulk-col-barcode">Barcode *</th>
+                <th class="bulk-col-copies">Copies</th>
+                <th class="bulk-col-status">Status</th>
+              </tr>
+            </thead>
+            <tbody id="bulk-table-body">
+            </tbody>
+          </table>
+        </div>
+
+        <div class="bulk-controls-bottom">
+          <span id="bulk-row-count" class="bulk-row-count">0 rows</span>
+          <div class="bulk-actions-bottom">
+            <button class="btn-primary" id="bulk-validate">Validate All</button>
+            <button class="btn-success" id="bulk-print-all">Print All</button>
+          </div>
+        </div>
+
+        <div id="bulk-result" class="result-message"></div>
       </div>
     </div>
 

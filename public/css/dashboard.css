@@ -901,3 +901,287 @@ html, body {
     font-size: 16px;
   }
 }
+
+/* ===== Bulk Labels ===== */
+
+.bulk-controls-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.bulk-global-fields {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  max-width: 600px;
+}
+
+.bulk-global-fields .template-field {
+  flex: 1;
+}
+
+.bulk-actions-top,
+.bulk-actions-bottom {
+  display: flex;
+  gap: 8px;
+}
+
+.bulk-controls-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.bulk-row-count {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Table wrapper */
+.bulk-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Table */
+.bulk-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 960px;
+}
+
+.bulk-table thead th {
+  background: var(--primary-light);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 6px;
+  text-align: left;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 2px solid var(--primary);
+}
+
+.bulk-table tbody td {
+  padding: 4px 3px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.bulk-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* Column widths */
+.bulk-col-delete { width: 36px; text-align: center; }
+.bulk-col-num { width: 32px; text-align: center; }
+.bulk-col-type { width: 110px; }
+.bulk-col-product { width: 170px; }
+.bulk-col-desc { width: 140px; }
+.bulk-col-size { width: 80px; }
+.bulk-col-price { width: 80px; }
+.bulk-col-offer { width: 120px; }
+.bulk-col-barcode { width: 130px; }
+.bulk-col-copies { width: 60px; }
+.bulk-col-status { width: 50px; text-align: center; }
+
+/* Table inputs */
+.bulk-table input,
+.bulk-table select {
+  padding: 7px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 13px;
+  width: 100%;
+  background: white;
+  transition: border-color var(--transition);
+}
+
+.bulk-table input:focus,
+.bulk-table select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* Validation error state */
+.bulk-cell-error input,
+.bulk-cell-error select {
+  border-color: var(--danger);
+  background: #fef2f2;
+}
+
+.bulk-cell-error {
+  position: relative;
+}
+
+.bulk-cell-error[data-error]:hover::after {
+  content: attr(data-error);
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: var(--danger);
+  color: white;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+  box-shadow: var(--shadow);
+}
+
+/* Row number */
+.bulk-row-num {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding-top: 10px;
+}
+
+/* Delete button */
+.bulk-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 15px;
+  padding: 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all var(--transition);
+}
+
+.bulk-delete-btn:hover {
+  background: #fee2e2;
+  color: var(--danger);
+}
+
+/* Status dot */
+.bulk-status-cell {
+  display: flex;
+  justify-content: center;
+  padding-top: 10px;
+}
+
+.bulk-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.bulk-status-dot.error,
+.bulk-status-dot.failed {
+  background: var(--danger);
+}
+
+.bulk-status-dot.sending {
+  background: var(--warning);
+  animation: bulkPulse 1s infinite;
+}
+
+.bulk-status-dot.done {
+  background: var(--success);
+}
+
+@keyframes bulkPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Offer cell */
+.bulk-offer-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bulk-offer-cell .calc-price {
+  font-size: 11px;
+  color: var(--success-dark);
+  font-weight: 500;
+  padding-left: 2px;
+}
+
+.bulk-offer-dash {
+  color: var(--text-secondary);
+  text-align: center;
+  padding-top: 8px;
+  font-size: 14px;
+}
+
+/* Progress bar */
+.bulk-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.bulk-progress-bar-container {
+  flex: 1;
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bulk-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.bulk-progress-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .bulk-global-fields {
+    flex-direction: column;
+    max-width: 100%;
+  }
+
+  .bulk-controls-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bulk-actions-top {
+    justify-content: flex-start;
+  }
+
+  .bulk-controls-bottom {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bulk-actions-bottom {
+    justify-content: stretch;
+  }
+
+  .bulk-actions-bottom .btn-primary,
+  .bulk-actions-bottom .btn-success {
+    flex: 1;
+  }
+}
