@@ -37,6 +37,7 @@
       <button class="tab" data-tab="bulk-labels">Bulk Labels</button>
       <button class="tab" data-tab="a4">A4</button>
       <button class="tab" data-tab="history">History</button>
+      <button class="tab" data-tab="settings">Settings</button>
     </nav>
 
     <!-- Overview Tab -->
@@ -286,6 +287,7 @@
             </div>
           </div>
           <div class="bulk-actions-top">
+            <button class="btn-template" id="bulk-import-dbf">Import from DBF</button>
             <button class="btn-template" id="bulk-add-row">+ Add Row</button>
             <button class="btn-template" id="bulk-load-sample">Load Sample</button>
             <button class="btn-template" id="bulk-clear-all">Clear All</button>
@@ -390,6 +392,53 @@
       </div>
     </div>
 
+    <!-- Settings Tab -->
+    <div class="tab-content" id="settings-tab">
+      <div class="card">
+        <h3>Item Database (DBF)</h3>
+        <p class="helper-text">
+          Path to your inventory <code>.DBF</code> file. The Bulk Labels tab reads this file fresh each time, so latest changes are always visible.
+        </p>
+        <div class="settings-row">
+          <label for="settings-dbf-path">DBF File Path</label>
+          <input type="text" id="settings-dbf-path" placeholder="C:\Users\you\inventory\ITEM.DBF" style="width:100%;">
+        </div>
+        <div class="settings-actions">
+          <button class="btn-primary" id="settings-dbf-save">Save</button>
+          <button class="btn-template" id="settings-dbf-test">Test</button>
+        </div>
+        <div id="settings-dbf-result" class="result-message"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DBF Picker Modal -->
+  <div id="dbf-picker-modal" class="modal" style="display:none;">
+    <div class="modal-backdrop" id="dbf-picker-backdrop"></div>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Import items from DBF</h3>
+        <button class="modal-close" id="dbf-picker-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="dbf-source-banner" class="dbf-source-banner" style="display:none;"></div>
+        <div class="modal-search">
+          <input type="text" id="dbf-search" placeholder="Search by code, quality, description, dimension..." autocomplete="off">
+          <span id="dbf-result-count" class="modal-count">&nbsp;</span>
+        </div>
+        <div id="dbf-results" class="dbf-results">
+          <div class="loading">Loading...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span id="dbf-selected-count" class="modal-selected">0 selected</span>
+        <div>
+          <button class="btn-template" id="dbf-picker-cancel">Cancel</button>
+          <button class="btn-success" id="dbf-picker-add" disabled>Add selected</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="/js/dashboard.js"></script>

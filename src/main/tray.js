@@ -113,19 +113,19 @@ async function updateTrayMenu(port) {
     menuTemplate.push({ type: 'separator' });
 
     // Actions
+    const dataBaseDir = app.isPackaged ? app.getPath('userData') : process.cwd();
+
     menuTemplate.push({
       label: 'Open Config Folder',
       click: () => {
-        const configPath = path.join(process.cwd(), 'config');
-        shell.openPath(configPath);
+        shell.openPath(path.join(dataBaseDir, 'config'));
       }
     });
 
     menuTemplate.push({
       label: 'Open Logs Folder',
       click: () => {
-        const logsPath = path.join(process.cwd(), 'logs');
-        shell.openPath(logsPath);
+        shell.openPath(path.join(dataBaseDir, 'logs'));
       }
     });
 

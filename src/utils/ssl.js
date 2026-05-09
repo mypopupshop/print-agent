@@ -1,9 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const selfsigned = require('selfsigned');
+const { app } = require('electron');
 const logger = require('./logger');
 
-const CERTS_DIR = path.join(__dirname, '../../config/certs');
+const baseDir = app && app.isPackaged ? app.getPath('userData') : path.join(__dirname, '../..');
+const CERTS_DIR = path.join(baseDir, 'config', 'certs');
 const KEY_PATH = path.join(CERTS_DIR, 'server.key');
 const CERT_PATH = path.join(CERTS_DIR, 'server.crt');
 

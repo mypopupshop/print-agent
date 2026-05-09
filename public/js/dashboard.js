@@ -263,6 +263,10 @@ function initializeButtons() {
 
   // Bulk labels
   initializeBulkLabels();
+
+  // DBF import + settings
+  initializeDbfPicker();
+  initializeSettingsTab();
 }
 
 // Load template into textarea
@@ -1535,6 +1539,279 @@ function bulkClearAll() {
 
   // Seed 5 empty rows
   for (let i = 0; i < 5; i++) bulkAddRow();
+}
+
+// ========== DBF picker (Bulk Labels → Import from DBF) ==========
+
+const dbfPicker = {
+  selected: new Map(), // itemCode -> item
+  lastResults: [],
+  searchTimer: null
+};
+
+function initializeDbfPicker() {
+  const importBtn = document.getElementById('bulk-import-dbf');
+  const closeBtn = document.getElementById('dbf-picker-close');
+  const cancelBtn = document.getElementById('dbf-picker-cancel');
+  const backdrop = document.getElementById('dbf-picker-backdrop');
+  const addBtn = document.getElementById('dbf-picker-add');
+  const search = document.getElementById('dbf-search');
+  const results = document.getElementById('dbf-results');
+
+  if (!importBtn) return;
+
+  importBtn.addEventListener('click', openDbfPicker);
+  closeBtn.addEventListener('click', closeDbfPicker);
+  cancelBtn.addEventListener('click', closeDbfPicker);
+  backdrop.addEventListener('click', closeDbfPicker);
+  addBtn.addEventListener('click', applyDbfSelection);
+
+  search.addEventListener('input', () => {
+    if (dbfPicker.searchTimer) clearTimeout(dbfPicker.searchTimer);
+    dbfPicker.searchTimer = setTimeout(() => loadDbfItems(search.value.trim()), 300);
+  });
+
+  results.addEventListener('click', (e) => {
+    const row = e.target.closest('.dbf-row');
+    if (!row) return;
+    const code = row.dataset.code;
+    if (!code) return;
+    const item = dbfPicker.lastResults.find(i => i.itemCode === code);
+    if (!item) return;
+
+    if (dbfPicker.selected.has(code)) {
+      dbfPicker.selected.delete(code);
+    } else {
+      dbfPicker.selected.set(code, item);
+    }
+    syncDbfRowSelection(row, code);
+    updateDbfFooter();
+  });
+}
+
+function openDbfPicker() {
+  dbfPicker.selected = new Map();
+  document.getElementById('dbf-search').value = '';
+  document.getElementById('dbf-picker-modal').style.display = 'flex';
+  updateDbfFooter();
+  loadDbfItems('');
+}
+
+function closeDbfPicker() {
+  document.getElementById('dbf-picker-modal').style.display = 'none';
+}
+
+async function loadDbfItems(search) {
+  const results = document.getElementById('dbf-results');
+  const count = document.getElementById('dbf-result-count');
+  const banner = document.getElementById('dbf-source-banner');
+  results.innerHTML = '<div class="loading">Loading...</div>';
+  count.textContent = '';
+  if (banner) {
+    banner.style.display = 'none';
+    banner.textContent = '';
+  }
+
+  try {
+    const url = search
+      ? `/label/dbf/items?limit=500&search=${encodeURIComponent(search)}`
+      : '/label/dbf/items?limit=500';
+    const res = await fetch(url);
+    const body = await res.json();
+
+    if (!res.ok || body.status !== 'ok') {
+      const err = body.error || 'UNKNOWN';
+      let msg = body.message || 'Failed to load items.';
+      if (err === 'DBF_PATH_NOT_CONFIGURED') {
+        msg = 'No DBF file configured and no cached copy available. Open the Settings tab and set the path first.';
+      } else if (err === 'DBF_NOT_FOUND') {
+        msg = 'DBF file not found and no cached copy available. Update the path in Settings.';
+      }
+      results.innerHTML = `<div class="dbf-empty">${escapeHtml(msg)}</div>`;
+      return;
+    }
+
+    if (body.source === 'cache' && banner) {
+      const when = body.cacheSavedAt ? formatCacheDate(body.cacheSavedAt) : 'earlier';
+      banner.textContent =
+        `Using cached items (last imported ${when}). Live DBF is unavailable — fix the path in Settings to refresh.`;
+      banner.style.display = 'block';
+    }
+
+    dbfPicker.lastResults = body.items;
+    renderDbfResults(body.items);
+    count.textContent = body.truncated
+      ? `Showing ${body.items.length} of ${body.total}+`
+      : `${body.total} items`;
+  } catch (e) {
+    results.innerHTML = `<div class="dbf-empty">Network error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function formatCacheDate(iso) {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
+  } catch (e) {
+    return iso;
+  }
+}
+
+function renderDbfResults(items) {
+  const results = document.getElementById('dbf-results');
+  if (!items.length) {
+    results.innerHTML = '<div class="dbf-empty">No items match.</div>';
+    return;
+  }
+
+  const rows = items.map(item => {
+    const isSel = dbfPicker.selected.has(item.itemCode);
+    const price = Number(item.itemrate || 0).toFixed(2);
+    return `<div class="dbf-row${isSel ? ' selected' : ''}" data-code="${escapeHtml(item.itemCode)}">
+      <input type="checkbox" ${isSel ? 'checked' : ''} tabindex="-1">
+      <span class="code">${escapeHtml(item.itemCode)}</span>
+      <span class="quality">${escapeHtml(item.quality)}</span>
+      <span class="dimension">${escapeHtml(item.dimension)}</span>
+      <span class="desc">${escapeHtml(item.ratesdesc)}</span>
+      <span class="price">Rs. ${escapeHtml(price)}</span>
+    </div>`;
+  }).join('');
+
+  results.innerHTML = rows;
+}
+
+function syncDbfRowSelection(rowEl, code) {
+  const isSel = dbfPicker.selected.has(code);
+  rowEl.classList.toggle('selected', isSel);
+  const cb = rowEl.querySelector('input[type="checkbox"]');
+  if (cb) cb.checked = isSel;
+}
+
+function updateDbfFooter() {
+  const n = dbfPicker.selected.size;
+  document.getElementById('dbf-selected-count').textContent =
+    `${n} selected`;
+  document.getElementById('dbf-picker-add').disabled = n === 0;
+}
+
+function applyDbfSelection() {
+  const items = Array.from(dbfPicker.selected.values());
+  if (!items.length) return;
+
+  for (const item of items) {
+    bulkAddRow({
+      type: 'regular',
+      product_name: item.quality || '',
+      description: item.ratesdesc || '',
+      size: item.dimension || '',
+      price: item.itemrate ? String(item.itemrate) : '',
+      barcode: item.itemCode || '',
+      copies: 1
+    });
+  }
+
+  closeDbfPicker();
+
+  const result = document.getElementById('bulk-result');
+  if (result) {
+    result.className = 'result-message success';
+    result.textContent = `Added ${items.length} item${items.length !== 1 ? 's' : ''} from DBF.`;
+    setTimeout(() => {
+      if (result.textContent.startsWith('Added ')) {
+        result.textContent = '';
+        result.className = 'result-message';
+      }
+    }, 4000);
+  }
+}
+
+// ========== Settings tab ==========
+
+function initializeSettingsTab() {
+  const saveBtn = document.getElementById('settings-dbf-save');
+  const testBtn = document.getElementById('settings-dbf-test');
+  const tab = document.querySelector('.tab[data-tab="settings"]');
+
+  if (!saveBtn || !testBtn || !tab) return;
+
+  // Lazy-load current value when tab is opened
+  tab.addEventListener('click', loadSettingsDbfPath);
+
+  saveBtn.addEventListener('click', saveSettingsDbfPath);
+  testBtn.addEventListener('click', testSettingsDbfPath);
+}
+
+async function loadSettingsDbfPath() {
+  try {
+    const res = await fetch('/config');
+    const body = await res.json();
+    if (res.ok && body.config) {
+      document.getElementById('settings-dbf-path').value = body.config.dbfPath || '';
+    }
+  } catch (e) {
+    // ignore — user can still type a value
+  }
+}
+
+async function saveSettingsDbfPath() {
+  const path = document.getElementById('settings-dbf-path').value.trim();
+  const result = document.getElementById('settings-dbf-result');
+
+  result.className = 'result-message';
+  result.textContent = 'Saving...';
+
+  try {
+    const res = await fetch('/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dbfPath: path })
+    });
+    const body = await res.json();
+    if (res.ok && body.status === 'ok') {
+      result.className = 'result-message success';
+      result.textContent = path
+        ? `Saved. DBF path is now "${path}".`
+        : 'Saved. DBF path cleared.';
+    } else {
+      result.className = 'result-message error';
+      result.textContent = body.message || 'Failed to save.';
+    }
+  } catch (e) {
+    result.className = 'result-message error';
+    result.textContent = `Network error: ${e.message}`;
+  }
+}
+
+async function testSettingsDbfPath() {
+  const result = document.getElementById('settings-dbf-result');
+  result.className = 'result-message';
+  result.textContent = 'Testing...';
+
+  try {
+    const res = await fetch('/label/dbf/items?limit=1');
+    const body = await res.json();
+    if (res.ok && body.status === 'ok') {
+      if (body.source === 'cache') {
+        const when = body.cacheSavedAt ? formatCacheDate(body.cacheSavedAt) : 'earlier';
+        result.className = 'result-message error';
+        const detail = body.liveError && body.liveError.code === 'DBF_NOT_FOUND'
+          ? 'file not found at the configured path'
+          : (body.liveError && body.liveError.code) || 'unavailable';
+        result.textContent =
+          `Live DBF ${detail}. Falling back to cache: ${body.total} items (last imported ${when}).`;
+      } else {
+        result.className = 'result-message success';
+        result.textContent = `OK. Found ${body.total} items.`;
+      }
+    } else {
+      result.className = 'result-message error';
+      result.textContent = body.message || `Test failed (${body.error || 'unknown'}).`;
+    }
+  } catch (e) {
+    result.className = 'result-message error';
+    result.textContent = `Network error: ${e.message}`;
+  }
 }
 
 // Cleanup on page unload
