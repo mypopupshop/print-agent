@@ -7,7 +7,12 @@
       "Bash(git commit:*)",
       "Bash(find C:UsersrishaSoftwareprint-agent -type f \\\\\\(-name *.jsx -o -name *.tsx -o -name *.vue \\\\\\))",
       "Bash(node -e \":*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git push *)",
+      "Bash(rm -rf \"/c/Users/risha/AppData/Local/electron-builder/Cache/winCodeSign/813976171\")",
+      "Read(//c/Users/risha/AppData/Local/electron-builder/Cache/winCodeSign//**)",
+      "Bash(start *)",
+      "Bash(xxd)"
     ]
   }
 }
