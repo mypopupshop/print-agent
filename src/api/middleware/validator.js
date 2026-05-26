@@ -9,11 +9,14 @@ const structuredReceiptSchema = Joi.object({
   type: Joi.string().valid('structured').required(),
   paperWidth: Joi.number().integer().valid(42, 48).default(48),
   store: Joi.object({
-    name: Joi.string().max(48).required(),
-    address: Joi.string().max(96),
-    phone: Joi.string().max(20),
+    // Sized for GST sales_invoice snapshots: legal names and registered
+    // addresses routinely exceed the old 48/96 caps and the thermal
+    // formatter word-wraps them, so bound generously rather than reject.
+    name: Joi.string().max(120).required(),
+    address: Joi.string().max(200),
+    phone: Joi.string().max(24),
     gstin: Joi.string().max(20),
-    email: Joi.string().max(48),
+    email: Joi.string().max(96),
     logoUrl: Joi.string().uri().max(512).allow('', null)
   }),
   invoice: Joi.object({
@@ -32,13 +35,13 @@ const structuredReceiptSchema = Joi.object({
     ref: Joi.string().max(40)
   }),
   customer: Joi.object({
-    name: Joi.string().max(48),
+    name: Joi.string().max(120),
     phone: Joi.string().max(20)
   }),
   items: Joi.array().items(Joi.object({
-    name: Joi.string().max(96).required(),
-    variant: Joi.string().max(96),
-    customisation: Joi.string().max(96),
+    name: Joi.string().max(150).required(),
+    variant: Joi.string().max(120),
+    customisation: Joi.string().max(120),
     quantity: Joi.number().positive().required(),
     unitPrice: Joi.number().min(0),
     discount: Joi.number().min(0).default(0),
@@ -198,7 +201,19 @@ function validate(schemaName) {
     });
 
     if (error) {
-      const errors = error.details.map(d => d.message).join(', ');
+      let details = error.details;
+      // alternatives().try() reports only a generic "does not match any of
+      // the allowed types" and swallows the inner schema's field errors. For
+      // a structured receipt, re-validate against the structured schema so the
+      // response names the offending field (e.g. store.address too long).
+      const d = req.body && req.body.data;
+      if (schemaName === 'receipt' && d && typeof d === 'object' && d.type === 'structured') {
+        const inner = structuredReceiptSchema.validate(d, { abortEarly: false, stripUnknown: true });
+        if (inner.error) {
+          details = inner.error.details.map(x => ({ ...x, message: `data.${x.message}` }));
+        }
+      }
+      const errors = details.map(d => d.message).join(', ');
       logger.warn(`Validation failed: ${errors}`);
 
       return res.status(400).json({
@@ -214,4 +229,4 @@ function validate(schemaName) {
   };
 }
 
-module.exports = { validate };
+module.exports = { validate, schemas, structuredReceiptSchema };
