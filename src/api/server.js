@@ -16,6 +16,7 @@ const printersRoute = require('./routes/printers');
 const labelRoute = require('./routes/label');
 const printStickerRoute = require('./routes/print-sticker');
 const printDiscountStickerRoute = require('./routes/print-discount-sticker');
+const configRoute = require('./routes/config');
 
 /**
  * Create and configure Express application
@@ -96,6 +97,7 @@ function createServer(config) {
   app.use(labelRoute);
   app.use(printStickerRoute);
   app.use(printDiscountStickerRoute);
+  app.use(configRoute);
 
   // Health check endpoint
   app.get('/health', (req, res) => {
@@ -118,6 +120,9 @@ function createServer(config) {
         'POST /label': 'Print label using template',
         'POST /print/sticker': 'Print sticker label from structured JSON',
         'POST /print/discount-sticker': 'Print discounted sticker label from structured JSON',
+        'GET /config': 'Get current dashboard-editable config values',
+        'PUT /config': 'Update dashboard-editable config values (e.g. dbfPath)',
+        'GET /label/dbf/items': 'List items from configured DBF file (search, limit)',
         'GET /label/templates': 'Get all label templates',
         'GET /label/templates/:name': 'Get specific template details',
         'GET /printers': 'List all printers',

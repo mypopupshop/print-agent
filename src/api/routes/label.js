@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const printQueue = require('../../services/queue/print-queue');
 const labelTemplates = require('../../services/templates/label-templates');
+const { loadConfig } = require('../../config/config-loader');
+const { getItemsWithFallback } = require('../../services/dbf-reader');
 const logger = require('../../utils/logger');
 const Joi = require('joi');
 
@@ -59,6 +61,74 @@ router.get('/label/templates/:templateName', (req, res, next) => {
   } catch (error) {
     logger.error('Get label template error:', error);
     next(error);
+  }
+});
+
+/**
+ * GET /label/dbf/items
+ * Read items from the configured DBF file and return a filtered/limited list
+ * for the bulk-sticker picker. Re-reads on every request (no caching).
+ *
+ * Query: search (optional substring), limit (default 500, max 2000)
+ */
+router.get('/label/dbf/items', async (req, res, next) => {
+  try {
+    const search = (req.query.search || '').trim().toLowerCase();
+    const limit = Math.min(
+      parseInt(req.query.limit, 10) || 500,
+      2000
+    );
+
+    const cfg = await loadConfig();
+    const result = await getItemsWithFallback(cfg.dbfPath);
+
+    const filtered = search
+      ? result.items.filter(i =>
+          i.itemCode.toLowerCase().includes(search) ||
+          i.quality.toLowerCase().includes(search) ||
+          i.ratesdesc.toLowerCase().includes(search) ||
+          i.dimension.toLowerCase().includes(search)
+        )
+      : result.items;
+
+    const truncated = filtered.length > limit;
+    const payload = {
+      status: 'ok',
+      items: filtered.slice(0, limit),
+      total: filtered.length,
+      truncated,
+      source: result.source
+    };
+    if (result.source === 'cache') {
+      payload.cacheSavedAt = result.savedAt;
+      payload.cacheSourcePath = result.sourcePath;
+      payload.liveError = result.error;
+    }
+    res.json(payload);
+  } catch (err) {
+    if (err.code === 'DBF_PATH_NOT_CONFIGURED') {
+      return res.status(400).json({
+        status: 'error',
+        error: 'DBF_PATH_NOT_CONFIGURED',
+        message: 'DBF path is not configured. Set it in the Settings tab.'
+      });
+    }
+    if (err.code === 'DBF_NOT_FOUND') {
+      return res.status(404).json({
+        status: 'error',
+        error: 'DBF_NOT_FOUND',
+        message: err.message
+      });
+    }
+    if (err.code === 'DBF_INVALID') {
+      return res.status(500).json({
+        status: 'error',
+        error: 'DBF_INVALID',
+        message: err.message
+      });
+    }
+    logger.error('GET /label/dbf/items error:', err);
+    next(err);
   }
 });
 

@@ -1,8 +1,10 @@
 const winston = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const path = require('path');
+const { app } = require('electron');
 
-const logDir = path.join(process.cwd(), 'logs');
+const baseDir = app && app.isPackaged ? app.getPath('userData') : process.cwd();
+const logDir = path.join(baseDir, 'logs');
 
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',

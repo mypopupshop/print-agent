@@ -4,6 +4,7 @@
  */
 
 const { wrapText, getMaxCharsForFont } = require('./text-wrapper');
+const { sanitizeCode128 } = require('../../utils/barcode');
 
 /**
  * Label templates in TSPL format
@@ -148,6 +149,8 @@ function renderTemplate(templateName, data = {}) {
       if (lines.length > 1) {
         wrappedData[key + '_line2'] = lines[1];
       }
+    } else if (key === 'barcode') {
+      wrappedData[key] = sanitizeCode128(value);
     } else {
       wrappedData[key] = value;
     }

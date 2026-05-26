@@ -1,7 +1,12 @@
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const Joi = require('joi');
 const path = require('path');
+const { app } = require('electron');
 const logger = require('../utils/logger');
+
+const userBaseDir = app && app.isPackaged ? app.getPath('userData') : process.cwd();
+const bundledConfigPath = path.join(app.getAppPath(), 'config', 'config.json');
 
 // Configuration schema validation
 const configSchema = Joi.object({
@@ -12,25 +17,36 @@ const configSchema = Joi.object({
   logLevel: Joi.string().valid('error', 'warn', 'info', 'debug').default('info'),
   retryAttempts: Joi.number().integer().min(0).max(10).default(3),
   retryDelay: Joi.number().integer().min(100).default(2000),
-  queueConcurrency: Joi.number().integer().min(1).max(10).default(1)
+  queueConcurrency: Joi.number().integer().min(1).max(10).default(1),
+  dbfPath: Joi.string().allow('').default('')
 });
+
+function getConfigPath() {
+  return path.join(userBaseDir, 'config', 'config.json');
+}
 
 /**
  * Load and validate configuration from config.json
  * @returns {Promise<Object>} Validated configuration object
  */
 async function loadConfig() {
-  const configPath = path.join(process.cwd(), 'config', 'config.json');
+  const configPath = getConfigPath();
 
   try {
     // Check if config file exists
     try {
       await fs.access(configPath);
     } catch (err) {
-      // Config doesn't exist, create default
-      logger.warn('Config file not found, creating default config.json');
-      const defaultConfig = await createDefaultConfig(configPath);
-      return defaultConfig;
+      // First run in packaged app: copy bundled default if available
+      if (app.isPackaged && fsSync.existsSync(bundledConfigPath)) {
+        logger.info('Seeding user config from bundled default');
+        await fs.mkdir(path.dirname(configPath), { recursive: true });
+        await fs.copyFile(bundledConfigPath, configPath);
+      } else {
+        logger.warn('Config file not found, creating default config.json');
+        const defaultConfig = await createDefaultConfig(configPath);
+        return defaultConfig;
+      }
     }
 
     // Read config file
@@ -74,7 +90,8 @@ async function createDefaultConfig(configPath) {
     logLevel: 'info',
     retryAttempts: 3,
     retryDelay: 2000,
-    queueConcurrency: 1
+    queueConcurrency: 1,
+    dbfPath: ''
   };
 
   // Ensure config directory exists
@@ -96,8 +113,45 @@ async function createDefaultConfig(configPath) {
  * Watch configuration file for changes and reload
  * @param {Function} onReload - Callback function called when config is reloaded
  */
+/**
+ * Persist updates to the user's config.json. Performs a merge against the
+ * current on-disk config, validates against the schema, and writes atomically.
+ * @param {Object} updates - Partial config values to merge
+ * @returns {Promise<Object>} The merged, validated config
+ */
+async function saveConfig(updates) {
+  const configPath = getConfigPath();
+
+  let current = {};
+  try {
+    const raw = await fs.readFile(configPath, 'utf-8');
+    current = JSON.parse(raw);
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+
+  const merged = { ...current, ...updates };
+
+  const { error, value } = configSchema.validate(merged, {
+    abortEarly: false,
+    stripUnknown: true
+  });
+  if (error) {
+    const msg = error.details.map(d => d.message).join(', ');
+    throw new Error(`Invalid configuration: ${msg}`);
+  }
+
+  await fs.mkdir(path.dirname(configPath), { recursive: true });
+  const tmpPath = configPath + '.tmp';
+  await fs.writeFile(tmpPath, JSON.stringify(value, null, 2), 'utf-8');
+  await fs.rename(tmpPath, configPath);
+
+  logger.info('Configuration saved');
+  return value;
+}
+
 function watchConfig(onReload) {
-  const configPath = path.join(process.cwd(), 'config', 'config.json');
+  const configPath = getConfigPath();
 
   fs.watch(configPath, { persistent: false }, async (eventType) => {
     if (eventType === 'change') {
@@ -116,5 +170,6 @@ function watchConfig(onReload) {
 
 module.exports = {
   loadConfig,
+  saveConfig,
   watchConfig
 };
