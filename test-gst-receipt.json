@@ -1,0 +1,80 @@
+{
+  "data": {
+    "type": "structured",
+    "store": {
+      "name": "Khoj Handloom & Co.",
+      "address": "4B Worli Sea Face, Worli, Mumbai 400018",
+      "phone": "+91 98201 44567",
+      "gstin": "27AABCK1234L1Z5"
+    },
+    "invoice": {
+      "number": "INV-2627-000123",
+      "date": "23 May 2026",
+      "time": "06:42 PM",
+      "paymentMethod": "UPI",
+      "documentType": "tax_invoice",
+      "documentTitle": "TAX INVOICE",
+      "placeOfSupply": "27 · Maharashtra",
+      "supplyType": "intra_state",
+      "channel": "POS · Walk-in"
+    },
+    "customer": {
+      "name": "Aanya Mehta",
+      "phone": "+91 99300 12233"
+    },
+    "items": [
+      {
+        "name": "Indigo Chanderi Kurta",
+        "variant": "Size M · Indigo",
+        "quantity": 1,
+        "unitPrice": 2499.0,
+        "total": 2499.0,
+        "hsn": "6204",
+        "gstRate": 5,
+        "taxableValue": 2380.0,
+        "taxAmount": 119.0
+      },
+      {
+        "name": "Block-print Dupatta",
+        "variant": "Mustard",
+        "quantity": 2,
+        "unitPrice": 899.0,
+        "total": 1798.0,
+        "hsn": "6214",
+        "gstRate": 5,
+        "taxableValue": 1712.38,
+        "taxAmount": 85.62
+      },
+      {
+        "name": "Lacquered Bangle Set",
+        "variant": "6 pcs · Size 2.6",
+        "quantity": 1,
+        "unitPrice": 599.0,
+        "total": 599.0,
+        "hsn": "7117",
+        "gstRate": 12,
+        "taxableValue": 534.82,
+        "taxAmount": 64.18
+      }
+    ],
+    "summary": {
+      "taxableValue": 4627.2,
+      "cgst": 134.4,
+      "sgst": 134.4,
+      "igst": 0,
+      "totalTax": 268.8,
+      "roundOff": 0,
+      "total": 4896.0,
+      "collectTax": true
+    },
+    "qr": {
+      "url": "https://khoj.mypopup.shop/i/inv-2627-000123",
+      "upi": "khoj@upi"
+    },
+    "footer": {
+      "message": "Thank you · come back soon",
+      "returnPolicy": "Returns within 7 days with this slip.",
+      "website": "Powered by Popup · mypopup.shop"
+    }
+  }
+}

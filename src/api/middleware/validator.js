@@ -20,7 +20,15 @@ const structuredReceiptSchema = Joi.object({
     date: Joi.string(),
     time: Joi.string(),
     cashier: Joi.string().max(30),
-    paymentMethod: Joi.string().max(20)
+    paymentMethod: Joi.string().max(24),
+    // GST sales-invoice header (design §6). Their presence switches the
+    // receipt formatter to the GST layout; absent → legacy sale receipt.
+    documentType: Joi.string().valid('tax_invoice', 'bill_of_supply'),
+    documentTitle: Joi.string().max(30),
+    placeOfSupply: Joi.string().max(64),
+    supplyType: Joi.string().valid('intra_state', 'inter_state'),
+    channel: Joi.string().max(24),
+    ref: Joi.string().max(40)
   }),
   customer: Joi.object({
     name: Joi.string().max(48),
@@ -33,7 +41,15 @@ const structuredReceiptSchema = Joi.object({
     quantity: Joi.number().positive().required(),
     unitPrice: Joi.number().min(0),
     discount: Joi.number().min(0).default(0),
-    total: Joi.number().min(0).required()
+    total: Joi.number().min(0).required(),
+    // Per-line GST snapshot (design §3.2). Rendered as-is; never recomputed.
+    hsn: Joi.string().max(12).allow('', null),
+    gstRate: Joi.number().min(0),
+    taxableValue: Joi.number().min(0),
+    cgstAmount: Joi.number().min(0),
+    sgstAmount: Joi.number().min(0),
+    igstAmount: Joi.number().min(0),
+    taxAmount: Joi.number().min(0)
   })).min(1).required(),
   summary: Joi.object({
     subtotal: Joi.number().min(0),
@@ -45,7 +61,22 @@ const structuredReceiptSchema = Joi.object({
     roundOff: Joi.number().default(0),
     total: Joi.number().min(0).required(),
     amountPaid: Joi.number().min(0),
-    change: Joi.number().min(0)
+    change: Joi.number().min(0),
+    // GST totals (snapshotted on the sales_invoices row).
+    taxableValue: Joi.number().min(0),
+    cgst: Joi.number().min(0),
+    sgst: Joi.number().min(0),
+    igst: Joi.number().min(0),
+    totalTax: Joi.number().min(0),
+    collectTax: Joi.boolean()
+  }),
+  // Mandatory composition-scheme declaration (design §6); printed in a box.
+  declaration: Joi.string().max(160),
+  // Optional verify/UPI QR — renders a native ESC/POS QR when supplied.
+  qr: Joi.object({
+    url: Joi.string().max(256).required(),
+    upi: Joi.string().max(64),
+    label: Joi.string().max(64)
   }),
   footer: Joi.object({
     message: Joi.string().max(96),
