@@ -51,7 +51,13 @@ class ESCPOSPrinter extends BasePrinter {
       let buffer;
 
       // Handle different data formats
-      if (typeof data === 'object' && data.type === 'structured') {
+      if (typeof data === 'object' && data.type === 'html') {
+        // Pre-rendered HTML from the web POS — rasterise via puppeteer
+        // and emit GS v 0 raster commands. The POS picks the layout; we
+        // only turn pixels into thermal-printer bytes.
+        const { renderHtmlToEscpos } = require('../templates/html-to-escpos');
+        buffer = await renderHtmlToEscpos(data.html, { width: data.width });
+      } else if (typeof data === 'object' && data.type === 'structured') {
         // Structured receipt JSON - format into ESC/POS commands
         const { formatReceipt } = require('../templates/receipt-formatter');
         buffer = await formatReceipt(data);
@@ -202,6 +208,14 @@ class ESCPOSPrinter extends BasePrinter {
    */
   async disconnect() {
     this.isConnected = false;
+    // Lazy HTML renderer holds a puppeteer browser; close it on shutdown
+    // so the Electron app can exit cleanly. require() is cheap here.
+    try {
+      const { shutdownBrowser } = require('../templates/html-to-escpos');
+      await shutdownBrowser();
+    } catch (err) {
+      logger.warn(`HTML renderer shutdown failed: ${err.message}`);
+    }
     logger.info(`ESC/POS printer "${this.deviceName}" disconnected`);
   }
 }

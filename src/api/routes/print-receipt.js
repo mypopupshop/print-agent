@@ -10,12 +10,21 @@ const { validate } = require('../middleware/validator');
  */
 router.post('/print/receipt', validate('receipt'), async (req, res, next) => {
   try {
-    const { data } = req.body;
-
-    logger.info('Receipt print request received');
+    // Two payload shapes are accepted (see validator.js):
+    //   { type: 'html', html, width? }   ← web POS pre-renders the receipt
+    //   { data: <string|structured|raw|binary> }  ← legacy callers
+    // Both ultimately become the `data` argument passed to ESCPOSPrinter.print().
+    let jobData;
+    if (req.body && req.body.type === 'html') {
+      jobData = { type: 'html', html: req.body.html, width: req.body.width };
+      logger.info(`Receipt print request received (html, ${req.body.html.length}B)`);
+    } else {
+      jobData = req.body.data;
+      logger.info('Receipt print request received');
+    }
 
     // Enqueue print job (non-blocking)
-    const result = await printQueue.enqueue('epson', data);
+    const result = await printQueue.enqueue('epson', jobData);
 
     res.json(result);
 

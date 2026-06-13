@@ -91,17 +91,33 @@ const structuredReceiptSchema = Joi.object({
 });
 
 /**
+ * HTML receipt payload (web POS pre-renders the receipt and ships HTML).
+ * Lives at the top level (not under `data`) per the contract with the POS.
+ */
+const htmlReceiptSchema = Joi.object({
+  type: Joi.string().valid('html').required(),
+  // 2MB upper bound — receipts with embedded base64 logos can be large but
+  // anything beyond this is almost certainly a malformed payload.
+  html: Joi.string().min(1).max(2 * 1024 * 1024).required(),
+  // Width must match one of the supported thermal-head dot widths.
+  width: Joi.number().integer().valid(384, 512, 576, 832).optional()
+});
+
+/**
  * Validation schemas for different endpoints
  */
 const schemas = {
-  receipt: Joi.object({
-    data: Joi.alternatives().try(
-      Joi.string(),
-      Joi.binary(),
-      structuredReceiptSchema,
-      Joi.object({ raw: Joi.string().required() })
-    ).required()
-  }),
+  receipt: Joi.alternatives().try(
+    htmlReceiptSchema,
+    Joi.object({
+      data: Joi.alternatives().try(
+        Joi.string(),
+        Joi.binary(),
+        structuredReceiptSchema,
+        Joi.object({ raw: Joi.string().required() })
+      ).required()
+    })
+  ),
 
   label: Joi.object({
     data: Joi.alternatives().try(
@@ -211,6 +227,12 @@ function validate(schemaName) {
         const inner = structuredReceiptSchema.validate(d, { abortEarly: false, stripUnknown: true });
         if (inner.error) {
           details = inner.error.details.map(x => ({ ...x, message: `data.${x.message}` }));
+        }
+      } else if (schemaName === 'receipt' && req.body && req.body.type === 'html') {
+        // Same idea for the html payload — surface "html is required" etc.
+        const inner = htmlReceiptSchema.validate(req.body, { abortEarly: false, stripUnknown: true });
+        if (inner.error) {
+          details = inner.error.details;
         }
       }
       const errors = details.map(d => d.message).join(', ');
