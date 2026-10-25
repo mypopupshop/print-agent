@@ -85,6 +85,25 @@ router.get('/jobs', async (req, res, next) => {
 });
 
 /**
+ * GET /jobs/:jobId
+ * One print job's status, so callers can confirm a receipt actually printed.
+ * POST /print/* returns as soon as the job is queued; the printer may still
+ * fail afterwards (paper out, powered off), after the queue's retries.
+ * status: pending (incl. waiting to retry) | processing | completed | failed
+ */
+router.get('/jobs/:jobId', (req, res) => {
+  const job = printQueue.getJob(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({
+      status: 'error',
+      error: 'JOB_NOT_FOUND',
+      message: `Job ${req.params.jobId} not found`
+    });
+  }
+  res.json({ status: 'ok', job });
+});
+
+/**
  * GET /network-info
  * Get network addresses other devices can use to connect
  */
