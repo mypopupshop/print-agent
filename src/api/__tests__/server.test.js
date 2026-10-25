@@ -86,6 +86,16 @@ describe('GET /health', () => {
   });
 });
 
+describe('GET /network-info', () => {
+  test('lists the https addresses to paste into the Popup POS', async () => {
+    const res = await request('GET', '/network-info');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.json.posUrls)).toBe(true);
+    for (const url of res.json.posUrls) expect(url).toMatch(/^https:\/\/[\d.]+:6320$/);
+    expect(res.json.posUrls).toHaveLength(res.json.addresses.length);
+  });
+});
+
 describe('GET /jobs/:jobId', () => {
   test('404s an unknown job', async () => {
     const res = await request('GET', '/jobs/does-not-exist');

@@ -122,12 +122,17 @@ router.get('/network-info', (req, res) => {
 
   const port = req.socket.localPort;
   const urls = addresses.map(a => `http://${a.address}:${port}`);
+  // What to paste into the Popup POS (an https page can only reach the LAN
+  // over https; the seller accepts the self-signed certificate once).
+  const httpsPort = req.app.locals.httpsPort;
+  const posUrls = httpsPort ? addresses.map(a => `https://${a.address}:${httpsPort}`) : [];
 
   res.json({
     status: 'ok',
     port,
     addresses,
     urls,
+    posUrls,
     localhost: `http://localhost:${port}`
   });
 });

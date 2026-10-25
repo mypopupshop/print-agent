@@ -565,11 +565,20 @@ async function loadNetworkInfo() {
     const response = await fetch(`${API_BASE}/network-info`);
     const data = await response.json();
 
-    if (data.status === 'ok' && data.urls.length > 0) {
+    // The Popup POS (https) needs the https address; fall back to plain URLs
+    // on agents where HTTPS didn't start.
+    const posUrls = Array.isArray(data.posUrls) ? data.posUrls : [];
+    const shown = posUrls.length > 0 ? posUrls : data.urls;
+
+    if (data.status === 'ok' && shown.length > 0) {
       const container = document.getElementById('network-info');
       const urlsEl = document.getElementById('network-urls');
+      if (posUrls.length > 0) {
+        container.querySelector('.network-info-label').textContent =
+          'Printer address for the Popup POS (Receipt printer settings):';
+      }
 
-      urlsEl.innerHTML = data.urls.map(url => `
+      urlsEl.innerHTML = shown.map(url => `
         <span class="network-url" title="Click to copy" onclick="copyToClipboard('${url}', this)">
           ${url}
           <span class="copy-hint">click to copy</span>
