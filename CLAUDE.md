@@ -59,7 +59,9 @@ src/
 - `GET /printers` - List configured printers with status
 - `GET /status` - System status and queue stats
 - `GET /jobs` - Print job history
-- `GET /health` - Health check
+- `GET /jobs/:jobId` - One job's status (pending/processing/completed/failed); the POS polls it to confirm a receipt printed
+- `GET /health` - Health check + discovery (`agent`, `version`, `ports.http/https`, LAN `addresses`)
+- `GET /network-info` - LAN addresses; `posUrls` are the https addresses to paste into the Popup POS
 
 ## Printer Types
 
@@ -105,7 +107,7 @@ src/
 - **Abstract Base Class**: BasePrinter extended by all printer implementations
 - **Non-blocking API**: Jobs enqueued and return immediately
 - **Automatic Retry**: Exponential backoff on print failures
-- **Local-only Access**: CORS restricts to localhost and LAN IPs
+- **Local-only Access**: CORS allows only parsed-hostname matches (localhost / *.localhost, *.mypopup.shop, *.getpopup.in, RFC 1918 IPs) — see `src/api/middleware/cors-policy.js`; Chrome Private Network Access preflights get `Access-Control-Allow-Private-Network: true`
 
 ## Error Codes
 

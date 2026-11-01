@@ -3,6 +3,9 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
 const logger = require('../utils/logger');
+const { getLanIPv4Addresses } = require('../utils/network');
+const { corsOptions, privateNetworkAccess } = require('./middleware/cors-policy');
+const { version: AGENT_VERSION } = require('../../package.json');
 
 // Middleware
 const errorHandler = require('./middleware/error-handler');
@@ -30,32 +33,10 @@ function createServer(config) {
   app.use(bodyParser.json({ limit: '10mb' }));
   app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-  // Enable CORS for localhost and local network
-  app.use(cors({
-    origin: function(origin, callback) {
-      // Allow requests with no origin (mobile apps, curl, etc.)
-      if (!origin) return callback(null, true);
-
-      // Allow localhost
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-        return callback(null, true);
-      }
-
-      // Allow Popup webapp (POS runs on mypopup.shop subdomains)
-      if (origin.endsWith('.mypopup.shop') || origin.endsWith('.getpopup.in') || origin === 'https://mypopup.shop' || origin === 'https://getpopup.in') {
-        return callback(null, true);
-      }
-
-      // Allow local network (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-      const localNetworkRegex = /(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)/;
-      if (localNetworkRegex.test(origin)) {
-        return callback(null, true);
-      }
-
-      callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true
-  }));
+  // CORS for the Popup web app, localhost and the shop LAN. The Private
+  // Network Access answer must be set before cors() ends the preflight.
+  app.use(privateNetworkAccess);
+  app.use(cors(corsOptions));
 
   // Request logging
   app.use(requestLogger);
@@ -99,12 +80,21 @@ function createServer(config) {
   app.use(printDiscountStickerRoute);
   app.use(configRoute);
 
-  // Health check endpoint
+  // Health check endpoint. Besides liveness it tells the POS where else this
+  // agent can be reached (LAN addresses + ports), so a browser that connected
+  // over localhost can remember the LAN URL for the shop's other devices.
   app.get('/health', (req, res) => {
     res.json({
       status: 'ok',
+      agent: 'popup-print-agent',
+      version: AGENT_VERSION,
       uptime: process.uptime(),
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      ports: {
+        http: req.app.locals.httpPort ?? null,
+        https: req.app.locals.httpsPort ?? null
+      },
+      addresses: getLanIPv4Addresses()
     });
   });
 
@@ -128,6 +118,7 @@ function createServer(config) {
         'GET /printers': 'List all printers',
         'GET /status': 'Get system status',
         'GET /jobs': 'Get recent print job history',
+        'GET /jobs/:jobId': 'Get one print job (pending/processing/completed/failed)',
         'GET /health': 'Health check',
         'GET /api': 'API information',
         'GET /': 'Dashboard (HTML)'
@@ -158,18 +149,8 @@ function createServer(config) {
  */
 async function startAPIServer(port, config) {
   const app = createServer(config);
-  const os = require('os');
-
-  // Gather local IPs for logging
-  const addresses = [];
-  const interfaces = os.networkInterfaces();
-  for (const name of Object.keys(interfaces)) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        addresses.push(iface.address);
-      }
-    }
-  }
+  // Local IPs for logging
+  const addresses = getLanIPv4Addresses();
 
   // Start HTTP server
   const httpServer = await new Promise((resolve, reject) => {
@@ -178,6 +159,7 @@ async function startAPIServer(port, config) {
         logger.error('Failed to start HTTP server:', err);
         reject(err);
       } else {
+        app.locals.httpPort = port;
         logger.info(`✓ HTTP Server running on http://localhost:${port}`);
         addresses.forEach(addr => {
           logger.info(`✓ Network access: http://${addr}:${port}`);
@@ -215,6 +197,7 @@ async function startAPIServer(port, config) {
         });
 
         httpsServer.listen(httpsPort, '0.0.0.0', () => {
+          app.locals.httpsPort = httpsPort;
           logger.info(`✓ HTTPS Server running on https://localhost:${httpsPort}`);
           addresses.forEach(addr => {
             logger.info(`✓ Secure access: https://${addr}:${httpsPort}`);

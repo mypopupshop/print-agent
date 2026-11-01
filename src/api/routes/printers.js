@@ -85,6 +85,25 @@ router.get('/jobs', async (req, res, next) => {
 });
 
 /**
+ * GET /jobs/:jobId
+ * One print job's status, so callers can confirm a receipt actually printed.
+ * POST /print/* returns as soon as the job is queued; the printer may still
+ * fail afterwards (paper out, powered off), after the queue's retries.
+ * status: pending (incl. waiting to retry) | processing | completed | failed
+ */
+router.get('/jobs/:jobId', (req, res) => {
+  const job = printQueue.getJob(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({
+      status: 'error',
+      error: 'JOB_NOT_FOUND',
+      message: `Job ${req.params.jobId} not found`
+    });
+  }
+  res.json({ status: 'ok', job });
+});
+
+/**
  * GET /network-info
  * Get network addresses other devices can use to connect
  */
@@ -103,12 +122,17 @@ router.get('/network-info', (req, res) => {
 
   const port = req.socket.localPort;
   const urls = addresses.map(a => `http://${a.address}:${port}`);
+  // What to paste into the Popup POS (an https page can only reach the LAN
+  // over https; the seller accepts the self-signed certificate once).
+  const httpsPort = req.app.locals.httpsPort;
+  const posUrls = httpsPort ? addresses.map(a => `https://${a.address}:${httpsPort}`) : [];
 
   res.json({
     status: 'ok',
     port,
     addresses,
     urls,
+    posUrls,
     localhost: `http://localhost:${port}`
   });
 });
